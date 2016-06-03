@@ -1,0 +1,9 @@
+setup(name='abaverify',
+      version='0.1',
+      description='A set of tools for automatic verification testing of Abaqus user subroutines',
+      url='',
+      author='Andrew Bergan',
+      author_email='andrew.c.bergan@nasa.gov',
+      license='NOSA',
+      packages=[''],
+      zip_safe=False)
