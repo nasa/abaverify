@@ -43,12 +43,17 @@ from caeModules import *
 import job
 
 import sys
-import jsonParser
 import json
 import re
 import shutil
 import numpy as np
 from operator import itemgetter
+
+# This is a brittle hack. TODO: use a different json parsing package, or put the existing code into a python package
+import inspect
+pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+sys.path.insert(0, pathForThisFile)
+import jsonparser
 
 
 # Throw-away debugger
@@ -258,7 +263,7 @@ jobName = sys.argv[-1]
 
 # Load parameters
 fileName = os.path.join(os.getcwd(), jobName + '.json')
-para = jsonParser.parse(fileName)
+para = jsonparser.parse(fileName)
 
 # Change working directory to testOutput and put a copy of the input file in testOutput
 os.chdir(os.path.join(os.getcwd(), 'testOutput'))

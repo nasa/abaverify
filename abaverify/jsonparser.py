@@ -1,6 +1,8 @@
 import json
 import re
 
+# From: http://www.lifl.fr/~damien.riquet/parse-a-json-file-with-comments.html
+
 # Regular expression for comments
 comment_re = re.compile(
     '(^)?[^\S\n]*/(?:\*(.*?)\*/[^\S\n]*|/[^\n]*)($)?',

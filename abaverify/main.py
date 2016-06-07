@@ -10,7 +10,7 @@ import re
 import shutil
 import subprocess
 import contextlib
-import jsonParser
+import jsonparser
 import itertools as it
 import time
 
@@ -140,7 +140,7 @@ class TestCase(unittest.TestCase):
 
 		outputFileName = os.path.join(os.getcwd(), 'testOutput', jobName + '_results.json')
 		if (os.path.isfile(outputFileName)):
-			results = jsonParser.parse(outputFileName)
+			results = jsonparser.parse(outputFileName)
 
 			for r in results:
 
