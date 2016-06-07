@@ -10,6 +10,6 @@ setup(
 		"jsonparser==0.1",
 	],
 	dependency_links=[
-		"ssh://fe.larc.nasa.gov/scr2/git/jsonparser.git@master#egg=jsonparser-0.1"
+		"git+ssh://fe.larc.nasa.gov/scr2/git/jsonparser.git@master#egg=jsonparser-0.1"
 	]
 )
