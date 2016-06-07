@@ -42,14 +42,19 @@ from abaqusConstants import *
 from caeModules import *
 import job
 
+import os
+import inspect
 import sys
 import json
-import jsonparser
 import re
 import shutil
 import numpy as np
 from operator import itemgetter
 
+# This is a crude hack, but its working
+pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+sys.path.insert(0, pathForThisFile)
+import jsonparser
 
 # Throw-away debugger
 def debug(obj):
@@ -250,7 +255,7 @@ def historyOutputNameFromIdentifier(identifier, steps=None):
     else:
         raise ValueError("Expecting that the argument is a list, dict, or str. Found " + str(type(identifier)))
 
-
+debug(os.getcwd())
 
 # Arguments
 jobName = sys.argv[-1]
