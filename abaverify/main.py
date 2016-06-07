@@ -13,6 +13,7 @@ import contextlib
 import jsonparser
 import itertools as it
 import time
+import inspect
 
 #
 # Local
@@ -89,7 +90,9 @@ class TestCase(unittest.TestCase):
 			self.runModel(jobName=jobName, f=f, timer=timer)
 
 		# Execute process_results script load ODB and get results
-		self.callAbaqus(cmd='abaqus cae noGUI=abaverify/abaverify/processresults.py -- ' + jobName, log=f, timer=timer)
+		pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+		pathForProcessResultsPy = os.path.join(pathForThisFile, 'processresults.py')
+		self.callAbaqus(cmd='abaqus cae noGUI=' + pathForProcessResultsPy + ' -- ' + jobName, log=f, timer=timer)
 
 		# Close the log file
 		f.close()
