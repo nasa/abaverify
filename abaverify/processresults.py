@@ -44,16 +44,11 @@ import job
 
 import sys
 import json
+import jsonparser
 import re
 import shutil
 import numpy as np
 from operator import itemgetter
-
-# This is a brittle hack. TODO: use a different json parsing package, or put the existing code into a python package
-import inspect
-pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-sys.path.insert(0, pathForThisFile)
-import jsonparser
 
 
 # Throw-away debugger
