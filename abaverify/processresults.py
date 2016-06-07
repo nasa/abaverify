@@ -1,8 +1,8 @@
 """
-Submits an abaqus job and writes results
+Opens an abaqus odb and gets requested results
 
 Arguments:
- 1. jobName: name of the abaqus job (code expects an input deck and a results json file with this name 
+ 1. jobName: name of the abaqus job (code expects an odb and a results json file with this name 
  	in the working dir)
 
 Sample usage:

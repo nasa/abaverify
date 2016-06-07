@@ -49,12 +49,25 @@ class SingleElementTests(av.TestCase):
 
 
 # Optionally, create parametric tests by defininging a dicitionary of parameters to vary
-# TODO: add example
+class ParametricMixedModeMatrix(av.TestCase):
+
+    # Specify meta class (Don't change this line)
+    __metaclass__ = av.ParametricMetaClass
+
+    # Refers to the template input file name
+    baseName = "test_C3D8R_mixedModeMatrix"
+
+    # Range of parameters to test; all combinations are tested
+    # alpha is the angle of the crack normal
+    # beta defines the direction of tensile loading in Step-1 and compressive loading in Step-2
+    parameters = {'alpha': range(0,50,10), 'beta': range(0,210,30), 'friction': [0.00, 0.15, 0.30, 0.45, 0.60]}
+
 
 
 # That's it for setup. Add as many tests as you want!
 
 # This last line is critical, it calls the abaverify code so that when you run this script
-# abaverify is executed
+# abaverify is executed. The function takes one optional argument: a function to call to compile
+# the subroutine code with abaqus make (not shown here).
 if __name__ == "__main__":
 	av.runTests()
