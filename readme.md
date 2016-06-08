@@ -36,8 +36,8 @@ tests $  pip install git+ssh://fe.larc.nasa.gov/scr2/git/abaverify.git@master#eg
 tests $  git clone ssh://fe.larc.nasa.gov/scr2/git/abaverify.git
 
 --- github ---
-tests $  pip install git+ssh://git@developer.nasa.gov/abergan/abaverify.git#egg=abaverify
-tests $  git clone git@developer.nasa.gov/abergan/abaverify.git
+tests $  pip install git+ssh://git@developer.nasa.gov/struct-mech/abaverify.git#egg=abaverify
+tests $  git clone git@developer.nasa.gov/struct-mech/abaverify.git
 ```
 
 The remainder of this section describes how to build your own tests using `abaverify`. For a working example, checkout the sample verification test in the `tests/` directory in the `abaverify` project folder. You can run the sample test with the command `python test_runner.py`.
