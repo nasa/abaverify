@@ -112,7 +112,7 @@ class TestCase(unittest.TestCase):
 				subext = '.f'
 			else:
 				subext = '.for'
-			userSubPath = os.path.join(os.getcwd(), '../for/CompDam_DGD' + subext)
+			userSubPath = os.path.join(os.getcwd(), options.relPathToUserSub + subext)
 
 		# Copy input deck
 		shutil.copyfile(os.path.join(os.getcwd(), jobName + '.inp'), os.path.join(os.getcwd(), 'testOutput', jobName + '.inp'))
@@ -320,7 +320,7 @@ class ParametricMetaClass(type):
 		return type.__new__(mcs, name, bases, dct)
 
 
-def runTests(compileCodeFunc=None):
+def runTests(relPathToUserSub, compileCodeFunc=None):
 	"""
 	This is the main entry point for abaverify.
 	There is option optional argument (compileCodeFunc) which is the function called to compile subroutines via 
@@ -337,6 +337,7 @@ def runTests(compileCodeFunc=None):
 	parser.add_option("-c", "--precompileCode", action="store_true", dest="precompileCode", default=False, help="Compiles the subroutine before running each tests")
 	parser.add_option("-e", "--useExistingBinaries", action="store_true", dest="useExistingBinaries", default=False, help="Uses existing binaries in /build")
 	parser.add_option("-r", "--useExistingResults", action="store_true", dest="useExistingResults", default=False, help="Uses existing results in /testOutput; useful for debugging postprocessing")
+	parser.add_option("-s", "--specifyPathToSub", action="store", dest="relPathToUserSub", default=relPathToUserSub, help="Override path to user subroutine")
 	(options, args) = parser.parse_args()
 
 	# Remove custom args so they do not get sent to unittest

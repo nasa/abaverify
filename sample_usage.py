@@ -70,4 +70,5 @@ class ParametricMixedModeMatrix(av.TestCase):
 # abaverify is executed. The function takes one optional argument: a function to call to compile
 # the subroutine code with abaqus make (not shown here).
 if __name__ == "__main__":
-	av.runTests()
+	# av.runTests(relPathToUserSub='../for/vumat')
+	av.runTests(relPathToUserSub='../path/to/your/subroutine/without/file/extension')

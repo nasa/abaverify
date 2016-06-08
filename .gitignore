@@ -11,3 +11,33 @@
 # Sublime text
 *.sublime*
 *.sublime*
+
+# Abaqus output files
+*.abq
+*.com
+*.dat
+*.log
+*.mdl
+*.msg
+*.odb
+*.pac
+*.par
+*.pes
+*.pmg
+*.prt
+*.res
+*.sel
+*.sim
+*.sta
+*.stt
+
+# Abaqus cae files
+*.env
+*.cae
+*.jnl
+*.rec
+*.deps
+*.rpy*
+
+# testOutput
+/tests/tests/testOutput/
