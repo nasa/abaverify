@@ -28,11 +28,16 @@ The user subroutine is stored in the `for/` directory and the verification tests
 ### Install `abaverify`
 Install `abaverify` by executing one of the following commands from the `tests/` directory:
 ```
+--- fe ---
 # This will install the latest version of abaverify (functionality only; source is hidden in site-packages)
 tests $  pip install git+ssh://fe.larc.nasa.gov/scr2/git/abaverify.git@master#egg=abaverify
 
 # This will intsall the source code of the lastest verison of abaverify
 tests $  git clone ssh://fe.larc.nasa.gov/scr2/git/abaverify.git
+
+--- github ---
+tests $  pip install git+ssh://git@developer.nasa.gov/abergan/abaverify.git#egg=abaverify
+tests $  git clone git@developer.nasa.gov/abergan/abaverify.git
 ```
 
 The remainder of this section describes how to build your own tests using `abaverify`. For a working example, checkout the sample verification test in the `tests/` directory in the `abaverify` project folder. You can run the sample test with the command `python test_runner.py`.
