@@ -1,17 +1,17 @@
 #include "usub-util.for"
 #include "materialProperties.for"
-      
-      subroutine vumat(
+
+      subroutine vumat( &
       ! Read only -
-     *  nblock, ndir, nshr, nstatev, nfieldv, nprops, lanneal,
-     *  stepTime, totalTime, dt, cmname, coordMp, charLength,
-     *  props, density, strainInc, relSpinInc,
-     *  tempOld, stretchOld, defgradOld, fieldOld,
-     *  stressOld, stateOld, enerInternOld, enerInelasOld,
-     *  tempNew, stretchNew, defgradNew, fieldNew,
+        nblock, ndir, nshr, nstatev, nfieldv, nprops, lanneal, &
+        stepTime, totalTime, dt, cmname, coordMp, charLength, &
+        props, density, strainInc, relSpinInc, &
+        tempOld, stretchOld, defgradOld, fieldOld, &
+        stressOld, stateOld, enerInternOld, enerInelasOld, &
+        tempNew, stretchNew, defgradNew, fieldNew, &
 
        ! Write only -
-     *  stressNew, stateNew, enerInternNew, enerInelasNew )
+        stressNew, stateNew, enerInternNew, enerInelasNew )
 
       ! Load modulues
       use materialProperties
@@ -20,15 +20,15 @@
       include 'aba_param.inc'
 #else
       include 'vaba_param.inc'
-#endif 
+#endif
 
       ! All arrays dimensioned by (*) are not used in this algorithm
-      dimension props(nprops), density(nblock), coordMp(nblock,*),
-     *  charLength(*), strainInc(nblock,ndir+nshr), relSpinInc(*), tempOld(*),
-     *  stretchOld(*), defgradOld(*), fieldOld(*), stressOld(nblock,ndir+nshr),
-     *  stateOld(nblock,nstatev), enerInternOld(nblock), enerInelasOld(nblock), 
-     *  tempNew(*), stretchNew(*), defgradNew(*), fieldNew(*), stressNew(nblock,ndir+nshr), 
-     *  stateNew(nblock,nstatev), enerInternNew(nblock), enerInelasNew(nblock)
+      dimension props(nprops), density(nblock), coordMp(nblock,*), &
+        charLength(*), strainInc(nblock,ndir+nshr), relSpinInc(*), tempOld(*), &
+        stretchOld(*), defgradOld(*), fieldOld(*), stressOld(nblock,ndir+nshr), &
+        stateOld(nblock,nstatev), enerInternOld(nblock), enerInelasOld(nblock), &
+        tempNew(*), stretchNew(*), defgradNew(*), fieldNew(*), stressNew(nblock,ndir+nshr), &
+        stateNew(nblock,nstatev), enerInternNew(nblock), enerInelasNew(nblock)
 
       character*80 cmname
 
@@ -42,7 +42,7 @@
       real(dp) :: stiff(ndir+nshr, ndir+nshr)        ! Stiffness tensor (often written as 'C')
       type(mproperties) :: p                         ! Material properties
 
-      ! --------------- END declarations --------------- 
+      ! --------------- END declarations ---------------
 
       ! Identify element type in material name
       call getElementType(cmname, mat, elementType)
@@ -53,7 +53,7 @@
       ! Load the elastic stiffness matrix
       call materialProperties_elasticStiffness(elementType, p, stiff)
 
-      
+
 
       ! nblock loop
       do 100 i = 1, nblock
@@ -67,7 +67,7 @@
 
         ! Change strainInc back to tensor strain
         strainInc(i,4:) = strainInc(i,4:)/2.d0
-        
+
   100 continue
 
 

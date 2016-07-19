@@ -1,6 +1,6 @@
 #ifndef umat
 #define umat 0
-#endif 
+#endif
 
 #include "usub-util.for"
 #include "materialProperties.for"
@@ -18,11 +18,11 @@
       INCLUDE 'ABA_PARAM.INC'
 
       CHARACTER*80 CMNAME
-      DIMENSION STRESS(NTENS),STATEV(NSTATV),
-     * DDSDDE(NTENS,NTENS),DDSDDT(NTENS),DRPLDE(NTENS),
-     * STRAN(NTENS),DSTRAN(NTENS),TIME(2),PREDEF(1),DPRED(1),
-     * PROPS(NPROPS),COORDS(3),DROT(3,3),DFGRD0(3,3),DFGRD1(3,3),
-     * JSTEP(4)
+      DIMENSION STRESS(NTENS),STATEV(NSTATV), &
+       DDSDDE(NTENS,NTENS),DDSDDT(NTENS),DRPLDE(NTENS), &
+       STRAN(NTENS),DSTRAN(NTENS),TIME(2),PREDEF(1),DPRED(1), &
+       PROPS(NPROPS),COORDS(3),DROT(3,3),DFGRD0(3,3),DFGRD1(3,3), &
+       JSTEP(4)
 
       ! == END standard Abaqus umat interface ==
 
@@ -35,14 +35,14 @@
       real(dp) :: strain(ntens)                      ! Strain vector (strain at the start of the increment + dstran)
       type(mproperties) :: p                         ! Material properties
 
-      ! --------------- END declarations --------------- 
+      ! --------------- END declarations ---------------
 
       ! Identify element type in material name
       call getElementType(cmname, mat, elementType)
 
       ! Load material properties, p
       call materialProperties_load(nprops, props, p)
-      
+
       ! Compute the total strain
       do i=1, ntens
         strain(i) = stran(i) + dstran(i)

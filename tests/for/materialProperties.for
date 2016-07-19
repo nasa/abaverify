@@ -1,4 +1,4 @@
-      
+
       module materialProperties
         ! Contains code relevant to importing material properties from props array
 
@@ -22,7 +22,7 @@
           include 'aba_param.inc'
 #else
           include 'vaba_param.inc'
-#endif 
+#endif
 
           ! Arguments
           integer, intent(in) :: nprops
@@ -88,7 +88,7 @@
           properties%nu32 = properties%nu23 * (properties%E3/properties%E2)
 
           ! TODO Add checks on elastic constants
-          
+
 
           return
         end subroutine materialProperties_load
@@ -122,8 +122,8 @@
             end if
 
           else if ((elementType .EQ. 'CPE') .OR. (elementType .EQ. 'C3D')) then      ! Plane strain and 3D
-            preFactor = (1-properties%nu12*properties%nu21-properties%nu23*properties%nu32-properties%nu13*properties%nu31
-     *         -2*properties%nu21*properties%nu32*properties%nu13)/(properties%E1*properties%E2*properties%E3)
+            preFactor = (1-properties%nu12*properties%nu21-properties%nu23*properties%nu32-properties%nu13*properties%nu31 &
+               -2*properties%nu21*properties%nu32*properties%nu13)/(properties%E1*properties%E2*properties%E3)
 
             stiff = 0.d0
             stiff(1,1) = (1-properties%nu23*properties%nu32)/(properties%E2*properties%E3*preFactor)
