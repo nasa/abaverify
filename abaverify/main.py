@@ -58,13 +58,13 @@ class measureRunTimes:
 #
 
 class TestCase(unittest.TestCase):
-	""" 
-	Base test case. Includes generic functionality to run tests on abaqus models. 
+	"""
+	Base test case. Includes generic functionality to run tests on abaqus models.
 	"""
 
 	def tearDown(self):
 		"""
-		Removes Abaqus temp files. This function is called by unittest. 
+		Removes Abaqus temp files. This function is called by unittest.
 		"""
 		files = os.listdir(os.getcwd())
 		patterns = [re.compile('.*abaqus.*\.rpy.*'), re.compile('.*abaqus.*\.rec.*')]
@@ -73,29 +73,26 @@ class TestCase(unittest.TestCase):
 
 	def runTest(self, jobName):
 		"""
-		Generic test method 
+		Generic test method
 		"""
 
 		# Save output to a log file
-		f = open(os.path.join(os.getcwd(), 'testOutput', jobName + '.log'), 'w')
+        with open(os.path.join(os.getcwd(), 'testOutput', jobName + '.log'), 'w') as f:
 
-		# Time tests
-		if options.time:
-			timer = measureRunTimes()
-		else:
-			timer = None
+    		# Time tests
+    		if options.time:
+    			timer = measureRunTimes()
+    		else:
+    			timer = None
 
-		# Execute the solver
-		if not options.useExistingResults:
-			self.runModel(jobName=jobName, f=f, timer=timer)
+    		# Execute the solver
+    		if not options.useExistingResults:
+    			self.runModel(jobName=jobName, f=f, timer=timer)
 
-		# Execute process_results script load ODB and get results
-		pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-		pathForProcessResultsPy = os.path.join(pathForThisFile, 'processresults.py')
-		self.callAbaqus(cmd='abaqus cae noGUI=' + pathForProcessResultsPy + ' -- ' + jobName, log=f, timer=timer)
-
-		# Close the log file
-		f.close()
+    		# Execute process_results script load ODB and get results
+    		pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+    		pathForProcessResultsPy = os.path.join(pathForThisFile, 'processresults.py')
+    		self.callAbaqus(cmd='abaqus cae noGUI=' + pathForProcessResultsPy + ' -- ' + jobName, log=f, timer=timer)
 
 		# Run assertions
 		self.runAssertionsOnResults(jobName)
@@ -137,8 +134,8 @@ class TestCase(unittest.TestCase):
 
 
 	def runAssertionsOnResults(self, jobName):
-		""" 
-		Runs assertions on each result in the jobName_results.json file 
+		"""
+		Runs assertions on each result in the jobName_results.json file
 		"""
 
 		outputFileName = os.path.join(os.getcwd(), 'testOutput', jobName + '_results.json')
@@ -257,25 +254,23 @@ class ParametricMetaClass(type):
 				shutil.copyfile(os.path.join(os.getcwd(), baseName + '.json'), os.path.join(os.getcwd(), jobName + '.json'))
 
 				# Save output to a log file
-				f = open(os.path.join(os.getcwd(), 'testOutput', jobName + '.log'), 'w')
+				with open(os.path.join(os.getcwd(), 'testOutput', jobName + '.log'), 'w') as f:
 
-				# Generate input file from python script
-				if 'pythonScriptForModel' in testCase:
-					callAbaqus(cmd='abaqus cae noGUI=' + inpFilePath, log=f)
+    				# Generate input file from python script
+    				if 'pythonScriptForModel' in testCase:
+    					callAbaqus(cmd='abaqus cae noGUI=' + inpFilePath, log=f)
 
-				# Time tests
-				if options.time:
-					timer = measureRunTimes()
-				else:
-					timer = None
+    				# Time tests
+    				if options.time:
+    					timer = measureRunTimes()
+    				else:
+    					timer = None
 
-				# Execute the solver
-				self.runModel(jobName=jobName, f=f, timer=timer)
+    				# Execute the solver
+    				self.runModel(jobName=jobName, f=f, timer=timer)
 
-				# Execute process_results script load ODB and get results
-				self.callAbaqus(cmd='abaqus cae noGUI=abaverify/abaverify/processresults.py -- ' + jobName, log=f, timer=timer)
-
-				f.close()
+    				# Execute process_results script load ODB and get results
+    				self.callAbaqus(cmd='abaqus cae noGUI=abaverify/abaverify/processresults.py -- ' + jobName, log=f, timer=timer)
 
 				os.remove(jobName + '.inp')  # Delete temporary parametric input file
 				os.remove(jobName + '.json') # Delete temporary parametric json file
@@ -323,8 +318,8 @@ class ParametricMetaClass(type):
 def runTests(relPathToUserSub, compileCodeFunc=None):
 	"""
 	This is the main entry point for abaverify.
-	There is option optional argument (compileCodeFunc) which is the function called to compile subroutines via 
-	abaqus make. This functionality is used when compiling the subroutine once before running several tests is 
+	There is option optional argument (compileCodeFunc) which is the function called to compile subroutines via
+	abaqus make. This functionality is used when compiling the subroutine once before running several tests is
 	desired. By default the subroutine is compiled at every test execution.
 	"""
 
