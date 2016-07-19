@@ -2,14 +2,14 @@
 Opens an abaqus odb and gets requested results
 
 Arguments:
- 1. jobName: name of the abaqus job (code expects an odb and a results json file with this name 
- 	in the working dir)
+ 1. jobName: name of the abaqus job (code expects an odb and a results text file with this name
+     in the working dir)
 
 Sample usage:
 $ abaqus cae noGUI=model_runner.py -- jobName
 
 Output:
-This code writes a file jobName_results.json with the reference value and the results collected from the job
+This code writes a file jobName_results.py with the reference value and the results collected from the job
 
 Test types:
 1. max, min:
@@ -19,7 +19,7 @@ Test types:
     when a discontinuity occurs that is larger than the reference value + tolerance. Assumes that only one
     identifier is specified.
 3. xy_infl_pt:
-    Records the location of an inflection point in an x-y data set. Assumes two identifiers are specified where 
+    Records the location of an inflection point in an x-y data set. Assumes two identifiers are specified where
     the first is the x-data and the second is the y-data. To speed up the search, a window can be specified
     as [min, max] where only values in x withing the bounds of the window are used in searching for the inflection
     point. The reference value and tolerance are specified as pairs corresponding to the x and y values [x, y].
@@ -27,7 +27,7 @@ Test types:
     It is possible that this test could produce errorneous results if the data is too noisy for the filter settings.
 4. disp_at_zero_y:
 5. log_stress_at_failure_init:
-    Writes specified stresses (stressComponents) when first failure index in failureIndices indicates failure (>= 1.0). 
+    Writes specified stresses (stressComponents) when first failure index in failureIndices indicates failure (>= 1.0).
     This test assumes that the input deck terminates the analysis shortly after failure is reached by using the *Filter card.
     All of the failure indices to check for failure should be included in the failureIndices array. The option
     additionalIdenitifiersToStore can be used to record additional outputs at the increment where failure occurs
@@ -41,11 +41,9 @@ import abaqusConstants
 from abaqusConstants import *
 from caeModules import *
 import job
-
 import os
 import inspect
 import sys
-import json
 import re
 import shutil
 import numpy as np
@@ -54,7 +52,6 @@ from operator import itemgetter
 # This is a crude hack, but its working
 pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 sys.path.insert(0, pathForThisFile)
-import jsonparser
 
 # Throw-away debugger
 def debug(obj):
@@ -74,8 +71,8 @@ def interpolate(x, xp, fp):
             return np.interp(-1*x, xpos, fp)
         else:
             raise Exception("Functionality to interpolate datasets that traverse 0 or are unsorted is not implemented")
-        
-    
+
+
 def resample(data, numPts):
     """
     Re-samples an xy data set to have the number of points specified and a linear space in x
@@ -177,13 +174,13 @@ def _historyOutputNameHelperElement(prefixString, identifier, steps):
 
 def historyOutputNameFromIdentifier(identifier, steps=None):
     """
-    Returns a well-formated history output name from the identifier. The identifier can be in any of a variety of 
+    Returns a well-formated history output name from the identifier. The identifier can be in any of a variety of
     formats. A list of identifiers can be provided in which case this function returns a tuple of history output names.
 
     The step is the name of the step of interest.
 
-    
-    Accepted identifier formats (JSON):
+
+    Accepted identifier formats:
     # Specify the complete identifier
     - "identifier": "Reaction force: RF1 at Node 9 in NSET LOADAPP"
     # Specify the complete identifier piecemeal
@@ -198,7 +195,7 @@ def historyOutputNameFromIdentifier(identifier, steps=None):
                 "position": "Element 1 Int Point 1",
                 "elset": "DAMAGEABLEROW"
             }
-    # Specify the identifier without a position. In this case, the code looks through the available history outputs for a 
+    # Specify the identifier without a position. In this case, the code looks through the available history outputs for a
     # valid match. If a single match is found, it is used. Otherwise an exception is raised. The step argument must be specified.
     - "identifier": {
                 "symbol": "RF1",
@@ -213,7 +210,7 @@ def historyOutputNameFromIdentifier(identifier, steps=None):
         for i in identifier:
             out.append(historyOutputNameFromIdentifier(identifier=i, steps=steps))
         return tuple(out)
-    
+
     # Case when identifier is a dictionary
     elif type(identifier) == type(dict()):
         if "symbol" in identifier:
@@ -255,15 +252,82 @@ def historyOutputNameFromIdentifier(identifier, steps=None):
     else:
         raise ValueError("Expecting that the argument is a list, dict, or str. Found " + str(type(identifier)))
 
+
+def write_results(results_to_write, fileName, depth=0):
+    """
+    Writes the contents of resultsFile list to a text file.
+    """
+
+    f = open(fileName, 'a')
+
+    if depth == 0:
+        f.write('results = ')
+
+    if type(results_to_write) == type(dict()):
+
+        f.write('\t'*depth + '{\n')
+
+        for r in results_to_write.keys():
+
+            f.write('\t'*depth + '"' + r + '": ')
+
+            if type(results_to_write[r]) == type(dict()):
+                f.write('\n')
+                f.close()
+                write_results(results_to_write[r], fileName, depth + 1)
+                f = open(fileName, 'a')
+
+            elif type(results_to_write[r]) == type(list()):
+                f.write('\n')
+                f.close()
+                write_results(results_to_write[r], fileName, depth + 1)
+                f = open(fileName, 'a')
+
+            elif type(results_to_write[r]) == type(str()):
+                f.write('"' + str(results_to_write[r]) + '",\n')
+            else:
+                f.write(str(results_to_write[r]) + ',\n')
+
+        if depth == 0:
+            f.write('\t'*depth + '}\n')
+        else:
+            f.write('\t'*depth + '},\n')
+
+    elif type(results_to_write) == type(list()):
+
+        f.write('\t'*depth + '[\n')
+
+        for r in results_to_write:
+
+            if type(r) == type(dict()):
+                f.close()
+                write_results(r, fileName, depth + 1)
+                f = open(fileName, 'a')
+
+            elif type(r) == type(list()):
+                f.close()
+                write_results(r, fileName, depth + 1)
+                f = open(fileName, 'a')
+
+            elif type(r) == type(str()):
+                f.write('\t'*depth + '"' + str(r) + '",\n')
+
+            else:
+                f.write('\t'*depth + str(r) + ',\n')
+
+        if depth == 0:
+            f.write('\t'*depth + ']\n')
+        else:
+            f.write('\t'*depth + '],\n')
+
+
 debug(os.getcwd())
 
 # Arguments
 jobName = sys.argv[-1]
-# jobName = "test_C3D8R_fiberMaimiLoadReversal"      # For debugging
 
 # Load parameters
-fileName = os.path.join(os.getcwd(), jobName + '.json')
-para = jsonparser.parse(fileName)
+para = __import__(jobName + '_expected').parameters
 
 # Change working directory to testOutput and put a copy of the input file in testOutput
 os.chdir(os.path.join(os.getcwd(), 'testOutput'))
@@ -302,7 +366,7 @@ for r in para["results"]:
         steps = (str(r["step"]), )
     else:
         steps = ("Step-1", )
-    
+
     # Debugging
     debug(steps)
     debug(r)
@@ -315,11 +379,15 @@ for r in para["results"]:
         # This trys to automatically determine the appropriate position specifier
         varName = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
 
+        f = open('temp.txt', 'a')
+        f.write(varName)
+        f.close()
+
         # Get the history data
         n = str(r["identifier"]["symbol"]) + '_' + steps[0] + '_' + str(r["type"])
         xyDataObj = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varName, steps=steps)
         xy = session.xyDataObjects[n]
-        odb.userData.XYData(n, xy)
+        # odb.userData.XYData(n, xy)
 
         # Get the value calculated in the analysis (last frame must equal to 1, which is total step time)
         if r["type"] == "max":
@@ -327,7 +395,7 @@ for r in para["results"]:
         else:
             r["computedValue"] = min([pt[1] for pt in xyDataObj])
         testResults.append(r)
-    
+
 
     # Enforce continuity
     elif r["type"] == "continuous":
@@ -361,7 +429,7 @@ for r in para["results"]:
         xyData = xy
         windowMin=r["window"][0]
         windowMax=r["window"][1]
-        
+
         # Select window
         windowed = [x for x in xyData if x[0] > windowMin and x[0] < windowMax]
         if len(windowed) == 0: raise Exception("No points found in specified window")
@@ -374,7 +442,7 @@ for r in para["results"]:
         # Calcuate the derivative using a moving window
         xy = differentiate(session.xyDataObjects['windowed'])
         xy = resample(data=xy, numPts=10000)
-        
+
         # Filter
         if "filterCutOffFreq" in r["identifier"][1]:
             session.XYData(data=xy, name="temp")
@@ -444,7 +512,7 @@ for r in para["results"]:
 
 
     elif r["type"] == "log_stress_at_failure_init":
-        
+
         # Load history data for failure indices and store xy object to list 'failed' if the index is failed at last increment
         failed = list()
         varNames = historyOutputNameFromIdentifier(identifier=r["failureIndices"], steps=steps)
@@ -498,7 +566,7 @@ for r in para["results"]:
             odb.userData.XYData(n, xy)
             additionalData[n] = xy[inc][1]
 
-        
+
         # Get job name
         jnparsed = parseJobName(jobName)
 
@@ -535,7 +603,7 @@ for r in para["results"]:
         xyData = xy
         windowMin=r["window"][0]
         windowMax=r["window"][1]
-        
+
         # Select window
         windowed = [x for x in xyData if x[0] > windowMin and x[0] < windowMax]
         if len(windowed) == 0: raise Exception("No points found in specified window")
@@ -555,7 +623,7 @@ for r in para["results"]:
         x, y = zip(*session.xyDataObjects['slope_xy_diff'])
         r["computedValue"] = np.mean(y)
         testResults.append(r)
-        
+
 
     else:
         raise NotImplementedError("test_case result data not recognized: " + str(r))
@@ -563,7 +631,15 @@ for r in para["results"]:
 # Save the odb
 odb.save()
 
-# Write the results to a json file for assertions by test_runner
-fileName = os.path.join(os.getcwd(), jobName + '_results.json')
-with open(fileName, 'w') as outfile:
-    json.dump(testResults, outfile, indent=4, separators=(',', ': '))
+# Write the results to a text file for assertions by test_runner
+fileName = os.path.join(os.getcwd(), jobName + '_results.py')
+
+# Remove the old results file if it exists
+try:
+    os.remove(fileName)
+except:
+    pass
+
+f = open(fileName, 'w')
+f.close()
+write_results(testResults, fileName)

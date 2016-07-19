@@ -10,7 +10,6 @@ import re
 import shutil
 import subprocess
 import contextlib
-import jsonparser
 import itertools as it
 import time
 import inspect
@@ -77,22 +76,22 @@ class TestCase(unittest.TestCase):
 		"""
 
 		# Save output to a log file
-        with open(os.path.join(os.getcwd(), 'testOutput', jobName + '.log'), 'w') as f:
+		with open(os.path.join(os.getcwd(), 'testOutput', jobName + '.log'), 'w') as f:
 
-    		# Time tests
-    		if options.time:
-    			timer = measureRunTimes()
-    		else:
-    			timer = None
+			# Time tests
+			if options.time:
+				timer = measureRunTimes()
+			else:
+				timer = None
 
-    		# Execute the solver
-    		if not options.useExistingResults:
-    			self.runModel(jobName=jobName, f=f, timer=timer)
+			# Execute the solver
+			if not options.useExistingResults:
+				self.runModel(jobName=jobName, f=f, timer=timer)
 
-    		# Execute process_results script load ODB and get results
-    		pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-    		pathForProcessResultsPy = os.path.join(pathForThisFile, 'processresults.py')
-    		self.callAbaqus(cmd='abaqus cae noGUI=' + pathForProcessResultsPy + ' -- ' + jobName, log=f, timer=timer)
+			# Execute process_results script load ODB and get results
+			pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+			pathForProcessResultsPy = '"' + os.path.join(pathForThisFile, 'processresults.py') + '"'
+			self.callAbaqus(cmd='abaqus cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName, log=f, timer=timer)
 
 		# Run assertions
 		self.runAssertionsOnResults(jobName)
@@ -135,12 +134,14 @@ class TestCase(unittest.TestCase):
 
 	def runAssertionsOnResults(self, jobName):
 		"""
-		Runs assertions on each result in the jobName_results.json file
+		Runs assertions on each result in the jobName_results.py file
 		"""
 
-		outputFileName = os.path.join(os.getcwd(), 'testOutput', jobName + '_results.json')
-		if (os.path.isfile(outputFileName)):
-			results = jsonparser.parse(outputFileName)
+		outputFileName = jobName + '_results.py'
+		outputFileDir = os.path.join(os.getcwd(), 'testOutput')
+		if (os.path.isfile(os.path.join(outputFileDir, outputFileName))):
+			sys.path.insert(0, outputFileDir)
+			results = __import__(outputFileName[:-3]).results
 
 			for r in results:
 
@@ -250,30 +251,30 @@ class ParametricMetaClass(type):
 				with file(inpFilePath, 'w') as modified:
 					modified.writelines(data)
 
-				# Generate .json file with jobName
-				shutil.copyfile(os.path.join(os.getcwd(), baseName + '.json'), os.path.join(os.getcwd(), jobName + '.json'))
+				# Generate an expected results Python file with jobName
+				shutil.copyfile(os.path.join(os.getcwd(), baseName + '_expected.py'), os.path.join(os.getcwd(), jobName + '_expected.py'))
 
 				# Save output to a log file
 				with open(os.path.join(os.getcwd(), 'testOutput', jobName + '.log'), 'w') as f:
 
-    				# Generate input file from python script
-    				if 'pythonScriptForModel' in testCase:
-    					callAbaqus(cmd='abaqus cae noGUI=' + inpFilePath, log=f)
+					# Generate input file from python script
+					if 'pythonScriptForModel' in testCase:
+						callAbaqus(cmd='abaqus cae noGUI=' + inpFilePath, log=f)
 
-    				# Time tests
-    				if options.time:
-    					timer = measureRunTimes()
-    				else:
-    					timer = None
+					# Time tests
+					if options.time:
+						timer = measureRunTimes()
+					else:
+						timer = None
 
-    				# Execute the solver
-    				self.runModel(jobName=jobName, f=f, timer=timer)
+					# Execute the solver
+					self.runModel(jobName=jobName, f=f, timer=timer)
 
-    				# Execute process_results script load ODB and get results
-    				self.callAbaqus(cmd='abaqus cae noGUI=abaverify/abaverify/processresults.py -- ' + jobName, log=f, timer=timer)
+					# Execute process_results script load ODB and get results
+					self.callAbaqus(cmd='abaqus cae noGUI=abaverify/abaverify/processresults.py -- ' + jobName, log=f, timer=timer)
 
 				os.remove(jobName + '.inp')  # Delete temporary parametric input file
-				os.remove(jobName + '.json') # Delete temporary parametric json file
+				os.remove(jobName + '_expected.py') # Delete temporary parametric expected results file
 				if 'pythonScriptForModel' in testCase:
 					os.remove(jobName + '.py')
 

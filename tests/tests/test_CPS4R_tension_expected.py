@@ -1,8 +1,8 @@
-{
+parameters = {
     "results": [
         {
             "type": "max",
-            "identifier": 
+            "identifier":
                 {
                     "symbol": "S11",
                     "elset": "ALL",
@@ -13,7 +13,7 @@
         },
         {
             "type": "max",
-            "identifier": 
+            "identifier":
                 {
                     "symbol": "S22",
                     "elset": "ALL",
