@@ -255,29 +255,29 @@ def historyOutputNameFromIdentifier(identifier, steps=None):
 
 def write_results(results_to_write, fileName, depth=0):
     """
-    Writes the contents of resultsFile list to a text file.
+    Writes the contents of resultsFile to a Python text file
+
+    :type results_to_write: list or dictionary
+    :type fileName: str
+    :type depth: int
     """
 
-    f = open(fileName, 'a')
-
+    # Create the file if it does not exist. If it does exist, open it for appending
     if depth == 0:
+        f = open(fileName, 'w')
         f.write('results = ')
+    else:
+        f = open(fileName, 'a')
 
     if type(results_to_write) == type(dict()):
 
         f.write('\t'*depth + '{\n')
 
-        for r in results_to_write.keys():
+        for r in results_to_write:
 
             f.write('\t'*depth + '"' + r + '": ')
 
-            if type(results_to_write[r]) == type(dict()):
-                f.write('\n')
-                f.close()
-                write_results(results_to_write[r], fileName, depth + 1)
-                f = open(fileName, 'a')
-
-            elif type(results_to_write[r]) == type(list()):
+            if (type(results_to_write[r]) == type(dict()) or type(results_to_write[r]) == type(list())):
                 f.write('\n')
                 f.close()
                 write_results(results_to_write[r], fileName, depth + 1)
@@ -299,12 +299,7 @@ def write_results(results_to_write, fileName, depth=0):
 
         for r in results_to_write:
 
-            if type(r) == type(dict()):
-                f.close()
-                write_results(r, fileName, depth + 1)
-                f = open(fileName, 'a')
-
-            elif type(r) == type(list()):
+            if (type(r) == type(dict()) or type(r) == type(list())):
                 f.close()
                 write_results(r, fileName, depth + 1)
                 f = open(fileName, 'a')
@@ -640,6 +635,4 @@ try:
 except:
     pass
 
-f = open(fileName, 'w')
-f.close()
 write_results(testResults, fileName)
