@@ -6,10 +6,4 @@ setup(
 	packages=[
 		"abaverify",
 	],
-	# install_requires=[
-	# 	"jsonparser==0.1",
-	# ],
-	# dependency_links=[
-	# 	"git+ssh://fe.larc.nasa.gov/scr2/git/jsonparser.git@master#egg=jsonparser-0.1"
-	# ]
 )

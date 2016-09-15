@@ -1,16 +1,19 @@
 # abaverify
-A python package built on [`unittest`](https://docs.python.org/2.7/library/unittest.html) for running verification tests on Abaqus user subroutines.
+A python package built on [`unittest`](https://docs.python.org/2.7/library/unittest.html) for running verification tests on Abaqus user subroutines. Basic familiarity with unittest and Abaqus user subroutine development is assumed in this readme.
+
+This software may be used, reproduced, and provided to others only as permitted under the terms of the agreement under which it was acquired from the U.S. Government. Neither title to, nor ownership of, the software is hereby transferred. This notice shall remain on all copies of the software.
+
+Copyright 2016 United States Government as represented by the Administrator of the National Aeronautics and Space Administration. No copyright is claimed in the United States under Title 17, U.S. Code. All Other Rights Reserved.
 
 For any questions, please contact the developers:
 - Andrew Bergan | [andrew.c.bergan@nasa.gov](mailto:andrew.c.bergan@nasa.gov) | (W) 757-864-3744
 - Frank Leone   | [frank.a.leone@nasa.gov](mailto:frank.a.leone@nasa.gov)     | (W) 757-864-3050
 
-This code is not to be distributed without the express permission of the developers.
-
 ## Getting-Started
-This package assumes that you have `python 2.7`, `pip`, and `git` installed. It also assumes that you have your Abaqus user subroutine in a git repository with a minimum directory structure as shown here:
+This package assumes that you have `python 2.7`, `pip`, and `git` installed. This packaged is designed for Abaqus 2016 and it has been used successfully with v6.14; it may or may not work with older versions. It also assumes that you have an Abaqus user subroutine in a git repository with a minimum directory structure as shown here:
 ```
 .
+    .git/
     for/
         usub.for
     tests/
@@ -23,29 +26,25 @@ This package assumes that you have `python 2.7`, `pip`, and `git` installed. It 
     .gitignore
 ```
 
-The user subroutine is stored in the `for/` directory and the verification tests are stored in the `tests/` directory.
+The user subroutine is stored in the `for/` directory and the verification tests are stored in the `<your_userSubroutine_repo_dir>/tests/` directory.
 
 ### Install `abaverify`
 Install `abaverify` by executing one of the following commands from the `tests/` directory:
+Using pip:
 ```
---- fe ---
-# This will install the latest version of abaverify (functionality only; source is hidden in site-packages)
-tests $  pip install git+ssh://fe.larc.nasa.gov/scr2/git/abaverify.git@master#egg=abaverify
-
-# This will intsall the source code of the lastest verison of abaverify
-tests $  git clone ssh://fe.larc.nasa.gov/scr2/git/abaverify.git
-
---- github ---
 tests $  pip install git+ssh://git@developer.nasa.gov/struct-mech/abaverify.git#egg=abaverify
+```
+Using git:
+```
 tests $  git clone git@developer.nasa.gov/struct-mech/abaverify.git
 ```
 
-The remainder of this section describes how to build your own tests using `abaverify`. For a working example, checkout the sample verification test in the `tests/` directory in the `abaverify` project folder. You can run the sample test with the command `python test_runner.py`.
+The remainder of this section describes how to build your own tests using `abaverify` (e.g., what goes inside the `test_model1.inp`, `test_model1_expected.py`, and `test_runner.py`) files. For a working example, checkout the sample verification test in the `abaverify/tests/tests/` directory. You can run the sample test with the command `python test_runner.py` from the `abaverify/tests/tests/` directory. Note, the default environment file (`abaverify/tests/tests`) is formatted for windows; linux users will need to modify the default environment file to the linux format.
 
-### Create `inp` and `py` files for each test model
-A model file (`*.inp` or `*.py`) and corresponding results file (`*_expected.py`) with the same name must be created for each test case. These files are placed in the `tests/` directory. The model file is a typical Abaqus input deck or python script, so no detailed discussion is provided here (any Abaqus model should work). When tests are executed, the models in the `tests/` directory are run in Abaqus.
+### Create `.inp` and `.py` files for each test model
+A model file (`*.inp` or `*.py`) and corresponding results file (`*_expected.py`) with the same name must be created for each test case. These files are placed in the `tests/` directory. The model file is a typical Abaqus input deck or python script, so no detailed discussion is provided here (any Abaqus model should work). When tests are executed (with the command `python test_runner.py`), the models in the `tests/` directory are run in Abaqus.
 
-The `*_expected.py` file defines the assertions that are run on the `odb` output from the analysis. After each analysis is completed, the script `abaverify/processresults.py` is called to collect the quantities defined in the `*_expected.py` file. The `*_expected.py` file contains a list called `"results"` that contains an object for each result of interest. A typical result quantity would be the maximum stress for the stress component `S11`. For example:
+The `*_expected.py` file defines the assertions that are run on the `odb` output from the analysis. After each analysis is completed, the script `abaverify/processresults.py` is called to collect the quantities defined in the `*_expected.py` file. The `*_expected.py` file must contain a list called `"results"` that contains an object for each result of interest. A typical result quantity would be the maximum stress for the stress component `S11`. For example:
 ```
 parameters = {
     "results":
@@ -69,7 +68,7 @@ parameters = {
         ]
 }   
 ```
-The value found in the `odb` must match the reference value for the test to pass. In the case above, the test is simply to say that `SDV_CDM_d2` is always zero. Any history output quantity can be interrogated using one of the following criteria defined in the `type` field: `max`, `min`, `continuous`, `xy_infl_pt`, `disp_at_zero_y`, `log_stress_at_failure_init`, or `slope`. Here's a more complicated example:
+The value found in the `odb` must match the reference value for the test to pass. In the case above, the test is simply to say that `SDV_CDM_d2` is always zero, since the range of `SDV_CDM_d2` happens to be between 0 and 1. Any history output quantity can be interrogated using one of the following criteria defined in the `type` field: `max`, `min`, `continuous`, `xy_infl_pt`, `disp_at_zero_y`, `log_stress_at_failure_init`, or `slope`. Here's a more complicated example:
 ```
 parameters = {
     "results":
@@ -138,9 +137,3 @@ The option `-e` or equivalently `--useExistingBinaries` can be specified to reus
 The option `-r` or equivalently `--useExistingResults` can be specified to reuse the most recent test results. The net effect is that only the post-processing portion of the code is run, so you don't have to wait for the model to run just to debug a `_expected.py` file or `processresults.py`.
 
 The option `-s` or equivalently `--specifyPathToSub` can be used to override the relative path to the user subroutine specified in the the call `av.runTests()` in your `test_runner.py` file.
-
-
-
-## TODO
-1. Add documentation to readme on creating test models and _expected.py files
-2. Make sure automatic is working. Add documentation for automatic.
