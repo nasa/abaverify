@@ -10,7 +10,7 @@ For any questions, please contact the developers:
 - Frank Leone   | [frank.a.leone@nasa.gov](mailto:frank.a.leone@nasa.gov)     | (W) 757-864-3050
 
 ## Getting-Started
-This package assumes that you have `python 2.7`, `pip`, and `git` installed. This packaged is designed for Abaqus 2016 and it has been used successfully with v6.14; it may or may not work with older versions. It also assumes that you have an Abaqus user subroutine in a git repository with a minimum directory structure as shown here:
+This package assumes that you have `python 2.7` and `git` installed. This packaged is designed for Abaqus 2016 and it has been used successfully with v6.14; it may or may not work with older versions. It also assumes that you have an Abaqus user subroutine in a git repository with a minimum directory structure as shown here:
 ```
 .
     .git/
@@ -30,13 +30,8 @@ The user subroutine is stored in the `for/` directory and the verification tests
 
 ### Install `abaverify`
 Install `abaverify` by executing one of the following commands from the `tests/` directory:
-Using pip:
 ```
-tests $  pip install git+ssh://git@developer.nasa.gov/struct-mech/abaverify.git#egg=abaverify
-```
-Using git:
-```
-tests $  git clone git@developer.nasa.gov/struct-mech/abaverify.git
+tests $  git clone git@developer.nasa.gov:struct-mech/abaverify.git
 ```
 
 The remainder of this section describes how to build your own tests using `abaverify` (e.g., what goes inside the `test_model1.inp`, `test_model1_expected.py`, and `test_runner.py`) files. For a working example, checkout the sample verification test in the `abaverify/tests/tests/` directory. You can run the sample test with the command `python test_runner.py` from the `abaverify/tests/tests/` directory. Note, the default environment file (`abaverify/tests/tests`) is formatted for windows; linux users will need to modify the default environment file to the linux format.
