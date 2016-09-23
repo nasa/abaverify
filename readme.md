@@ -113,6 +113,7 @@ To run a single test, add the class and test name. For example for the input dec
 tests $  python test_runner.py SingleElementTests.test_CPS4R_tension
 ```
 
+### Options
 Various command line options can be used as described below.
 
 The option `-i` or equivalently `--interactive` can be specified to print the Abaqus log data to the terminal. For example:
@@ -132,3 +133,5 @@ The option `-e` or equivalently `--useExistingBinaries` can be specified to reus
 The option `-r` or equivalently `--useExistingResults` can be specified to reuse the most recent test results. The net effect is that only the post-processing portion of the code is run, so you don't have to wait for the model to run just to debug a `_expected.py` file or `processresults.py`.
 
 The option `-s` or equivalently `--specifyPathToSub` can be used to override the relative path to the user subroutine specified in the the call `av.runTests()` in your `test_runner.py` file.
+
+The option `-A` or equivalently `--abaqusCmd` can be used to override the abaqus command to specify a particular version of abaqus. By default, the abaqus command is `abaqus`. Specify a string after the option to use a different version of abaqus. For example: `-A abq6123`.

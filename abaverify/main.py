@@ -66,7 +66,7 @@ class TestCase(unittest.TestCase):
 		Removes Abaqus temp files. This function is called by unittest.
 		"""
 		files = os.listdir(os.getcwd())
-		patterns = [re.compile('.*abaqus.*\.rpy.*'), re.compile('.*abaqus.*\.rec.*')]
+		patterns = [re.compile('.*abaqus.*\.rpy.*'), re.compile('.*abaqus.*\.rec.*'), re.compile('.*pyc')]
 		[os.remove(f) for f in files if any(regex.match(f) for regex in patterns)]
 
 
@@ -90,8 +90,10 @@ class TestCase(unittest.TestCase):
 
 			# Execute process_results script load ODB and get results
 			pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+			if not os.path.isfile(os.path.join(os.getcwd(), 'testOutput', jobName + '.odb')):
+				raise Exception("Error: Abaqus odb was not generated. Check the log file in the testOutput directory.")
 			pathForProcessResultsPy = '"' + os.path.join(pathForThisFile, 'processresults.py') + '"'
-			self.callAbaqus(cmd='abaqus cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName, log=f, timer=timer)
+			self.callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName, log=f, timer=timer)
 
 		# Run assertions
 		self.runAssertionsOnResults(jobName)
@@ -114,7 +116,7 @@ class TestCase(unittest.TestCase):
 		shutil.copyfile(os.path.join(os.getcwd(), jobName + '.inp'), os.path.join(os.getcwd(), 'testOutput', jobName + '.inp'))
 
 		# build abaqus cmd
-		cmd = 'abaqus job=' + jobName
+		cmd = options.abaqusCmd + ' job=' + jobName
 		if not options.precompileCode:
 			cmd += ' user="' + userSubPath + '"'
 		cmd += ' double=both interactive'
@@ -259,7 +261,7 @@ class ParametricMetaClass(type):
 
 					# Generate input file from python script
 					if 'pythonScriptForModel' in testCase:
-						callAbaqus(cmd='abaqus cae noGUI=' + inpFilePath, log=f)
+						self.callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + inpFilePath, log=f)
 
 					# Time tests
 					if options.time:
@@ -271,7 +273,11 @@ class ParametricMetaClass(type):
 					self.runModel(jobName=jobName, f=f, timer=timer)
 
 					# Execute process_results script load ODB and get results
-					self.callAbaqus(cmd='abaqus cae noGUI=abaverify/abaverify/processresults.py -- ' + jobName, log=f, timer=timer)
+					pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+					if not os.path.isfile(os.path.join(os.getcwd(), 'testOutput', jobName + '.odb')):
+						raise Exception("Error: Abaqus odb was not generated. Check the log file in the testOutput directory.")
+					pathForProcessResultsPy = '"' + os.path.join(pathForThisFile, 'processresults.py') + '"'
+					self.callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName, log=f, timer=timer)
 
 				os.remove(jobName + '.inp')  # Delete temporary parametric input file
 				os.remove(jobName + '_expected.py') # Delete temporary parametric expected results file
@@ -334,13 +340,29 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 	parser.add_option("-e", "--useExistingBinaries", action="store_true", dest="useExistingBinaries", default=False, help="Uses existing binaries in /build")
 	parser.add_option("-r", "--useExistingResults", action="store_true", dest="useExistingResults", default=False, help="Uses existing results in /testOutput; useful for debugging postprocessing")
 	parser.add_option("-s", "--specifyPathToSub", action="store", dest="relPathToUserSub", default=relPathToUserSub, help="Override path to user subroutine")
+	parser.add_option("-A", "--abaqusCmd", action="store", type="string", dest="abaqusCmd", default='abaqus', help="Override abaqus command; e.g. abq6141")
 	(options, args) = parser.parse_args()
 
 	# Remove custom args so they do not get sent to unittest
 	# http://stackoverflow.com/questions/1842168/python-unit-test-pass-command-line-arguments-to-setup-of-unittest-testcase
+	# Loop through known options
 	for x in sum([h._long_opts+h._short_opts for h in parser.option_list],[]):
+		# Check if the known option is an argument 
 		if x in sys.argv:
-			sys.argv.remove(x)
+			# Get the option object
+			if x in [h._short_opts[0] for h in parser.option_list]:
+				idx = [h._short_opts[0] for h in parser.option_list].index(x)
+				option = parser.option_list[idx]
+			elif  x in [h._long_opts[0] for h in parser.option_list]:
+				raise ''
+			
+			# If the option has additional info (e.g. -A abq6141), remove both from argv
+			if option.type == "string":
+				idx = sys.argv.index(x)
+				del sys.argv[idx:idx+2]
+			else:
+				sys.argv.remove(x)
+			
 
 	# Remove rpy files
 	testPath = os.getcwd()
@@ -417,6 +439,7 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 			shutil.copyfile(os.path.join(os.getcwd(), 'abaqus_v6.env'), os.path.join(os.getcwd(), 'testOutput', 'abaqus_v6.env'))
 		else:
 			raise Exception("Missing environment file. Please configure a local abaqus environement file. See getting started in readme.")
+
 
 
 	unittest.main(verbosity=2)

@@ -374,10 +374,6 @@ for r in para["results"]:
         # This trys to automatically determine the appropriate position specifier
         varName = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
 
-        f = open('temp.txt', 'a')
-        f.write(varName)
-        f.close()
-
         # Get the history data
         n = str(r["identifier"]["symbol"]) + '_' + steps[0] + '_' + str(r["type"])
         xyDataObj = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varName, steps=steps)
