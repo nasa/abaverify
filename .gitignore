@@ -1,0 +1,42 @@
+# Compiled python modules.
+*.pyc
+
+# Setuptools distribution folder.
+/dist/
+/build/
+
+# Python egg metadata, regenerated from source files by setuptools.
+/*.egg-info
+
+# Sublime text
+*.sublime*
+*.sublime*
+
+# Abaqus output files
+*.abq
+*.com
+*.dat
+*.log
+*.mdl
+*.msg
+*.odb
+*.pac
+*.par
+*.pes
+*.pmg
+*.prt
+*.res
+*.sel
+*.sim
+*.sta
+*.stt
+
+# Abaqus cae files
+*.cae
+*.jnl
+*.rec
+*.deps
+*.rpy*
+
+# testOutput
+/tests/tests/testOutput/
