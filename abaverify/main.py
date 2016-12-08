@@ -341,6 +341,7 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 	parser.add_option("-r", "--useExistingResults", action="store_true", dest="useExistingResults", default=False, help="Uses existing results in /testOutput; useful for debugging postprocessing")
 	parser.add_option("-s", "--specifyPathToSub", action="store", dest="relPathToUserSub", default=relPathToUserSub, help="Override path to user subroutine")
 	parser.add_option("-A", "--abaqusCmd", action="store", type="string", dest="abaqusCmd", default='abaqus', help="Override abaqus command; e.g. abq6141")
+	parser.add_option("-k", "--keepExistingOutputFiles", action="store_true", dest="keepExistingOutputFile", default=False, help="Does not delete existing files in the /testOutput directory")
 	(options, args) = parser.parse_args()
 
 	# Remove custom args so they do not get sent to unittest
@@ -386,11 +387,53 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 
 	# Remove old job files
 	if not options.useExistingResults:
-		testOutputPath = os.path.join(os.getcwd(), 'testOutput')
-		pattern = re.compile('.*\.env$')
-		for f in os.listdir(testOutputPath):
-			if not pattern.match(f):
-				os.remove(os.path.join(os.getcwd(), 'testOutput', f))
+		if not options.keepExistingOutputFile:
+			testOutputPath = os.path.join(os.getcwd(), 'testOutput')
+			pattern = re.compile('.*\.env$')
+			for f in os.listdir(testOutputPath):
+				if not pattern.match(f):
+					os.remove(os.path.join(os.getcwd(), 'testOutput', f))
+		else:
+			# Check for files with the same name to avoid overwriting
+			# This is a bit of pain
+			# Process:
+			# 1. Check if args any are classes in the calling file that are specified as arguments
+			classesInCallingFile = {}
+			# Get the calling file
+			frame = inspect.stack()[1]
+			# Get the classes in the calling file
+			for name, obj in inspect.getmembers(inspect.getmodule(frame[0])):
+				if inspect.isclass(obj) and issubclass(obj, TestCase):
+					classesInCallingFile[obj.__name__] = obj
+			calledClasses = list(set(sys.argv[1:]).intersection(classesInCallingFile.keys()))
+
+			# 2. Build a list of test_ methods that will be called
+			calledMethods = []
+
+			# 3. Get test_ methods from the class(es) that are called
+			for c in calledClasses:
+				for name, obj in inspect.getmembers(classesInCallingFile[c], predicate=inspect.ismethod):
+					if 'test_' in name:
+						calledMethods.append(name)
+
+			# 4. Get test_ methods list explicity in the arguments
+			for arg in sys.argv[1:]:
+				if len(arg.split('.')) == 2:
+					testName = arg.split('.')[1]
+					if 'test' in testName:
+						calledMethods.append(testName)
+			
+			# Now we have a list of the test methods that will be called
+			# print calledMethods
+
+			# Get a list of unique file names begining with 'test' in testOutput directory (w/o file extensions)
+			uniquefileNames = list(set([f.split('.')[0] for f in os.listdir(testOutputPath) if 'test_' in f]))
+
+			# Check if any files exist in testOutput with these test names
+			testsToBeOverwritten = list(set(uniquefileNames).intersection(calledMethods))
+			if len(testsToBeOverwritten) > 0:
+				raise Exception("Cannot overwrite the following tests {0}".format(str(testsToBeOverwritten)))
+
 
 		# Try to pre-compile the code
 		if not options.useExistingBinaries:
