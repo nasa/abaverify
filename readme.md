@@ -63,7 +63,7 @@ parameters = {
         ]
 }   
 ```
-The value found in the `odb` must match the reference value for the test to pass. In the case above, the test is simply to say that `SDV_CDM_d2` is always zero, since the range of `SDV_CDM_d2` happens to be between 0 and 1. Any history output quantity can be interrogated using one of the following criteria defined in the `type` field: `max`, `min`, `continuous`, `xy_infl_pt`, `disp_at_zero_y`, `log_stress_at_failure_init`, or `slope`. Here's a more complicated example:
+The value found in the `odb` must match the reference value for the test to pass. In the case above, the test is simply to say that `SDV_CDM_d2` is always zero, since the range of `SDV_CDM_d2` happens to be between 0 and 1. Any history output quantity can be interrogated using one of the following criteria defined in the `type` field: `max`, `min`, `continuous`, `xy_infl_pt`, `disp_at_zero_y`, `log_stress_at_failure_init`, `slope`, or `finalValue`. Here's a more complicated example:
 ```
 parameters = {
     "results":
@@ -113,7 +113,7 @@ To run a single test, add the class and test name. For example for the input dec
 tests $  python test_runner.py SingleElementTests.test_CPS4R_tension
 ```
 
-### Options
+## Command Line Options
 Various command line options can be used as described below.
 
 The option `-i` or equivalently `--interactive` can be specified to print the Abaqus log data to the terminal. For example:
@@ -135,3 +135,14 @@ The option `-r` or equivalently `--useExistingResults` can be specified to reuse
 The option `-s` or equivalently `--specifyPathToSub` can be used to override the relative path to the user subroutine specified in the the call `av.runTests()` in your `test_runner.py` file.
 
 The option `-A` or equivalently `--abaqusCmd` can be used to override the abaqus command to specify a particular version of abaqus. By default, the abaqus command is `abaqus`. Specify a string after the option to use a different version of abaqus. For example: `-A abq6123`.
+
+## Results `type`
+A variety of different types of results can be extracted from the odbs and compared with reference values. A list of each support type and brief explanation are provided below:
+- `max`: finds the maximum value of an xy data set
+- `min`: finds the minimum value of an xy data set
+- `continuous`: finds the maximum delta between two sequential increments an xy data set
+- `xy_infl_pt`: finds an inflection point in xy data set
+- `disp_at_zero_y`: finds the displacement (implied as x value) where the y value is zero in an xy data set
+- `log_stress_at_failure_init`: finds stress at failure (intended for checking failure criteria)
+- `slope`: finds the slope of an xy data set
+- `finalValue`: finds the y value at the last increment in the xy data set

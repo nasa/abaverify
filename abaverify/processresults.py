@@ -616,6 +616,20 @@ for r in para["results"]:
         testResults.append(r)
 
 
+    elif r["type"] == "finalValue":
+        # This trys to automatically determine the appropriate position specifier
+        varName = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
+
+        # Get the history data
+        n = str(r["identifier"]["symbol"]) + '_' + steps[0] + '_' + str(r["type"])
+        xyDataObj = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varName, steps=steps)
+        xy = session.xyDataObjects[n]
+
+        # Get the value calculated in the analysis (last frame must equal to 1, which is total step time)
+        r["computedValue"] = xyDataObj[-1][1]
+        
+        testResults.append(r)
+
     else:
         raise NotImplementedError("test_case result data not recognized: " + str(r))
 
