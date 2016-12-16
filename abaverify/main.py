@@ -270,7 +270,8 @@ class ParametricMetaClass(type):
 						timer = None
 
 					# Execute the solver
-					self.runModel(jobName=jobName, f=f, timer=timer)
+					if not options.useExistingResults:
+						self.runModel(jobName=jobName, f=f, timer=timer)
 
 					# Execute process_results script load ODB and get results
 					pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
