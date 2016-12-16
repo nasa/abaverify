@@ -227,9 +227,12 @@ class ParametricMetaClass(type):
 			Creates test_ function for the particular test case passed in
 			"""
 
+			items = testCase.items()
+
 			jobName = testCase['name']
 			baseName = testCase['baseName']
-			parameters = {k: v for k, v in testCase.items() if not k in ('baseName', 'name')}
+			parameters = {k: v for k, v in items if not k in ('baseName', 'name')}
+
 
 			def test(self):
 
@@ -254,7 +257,19 @@ class ParametricMetaClass(type):
 					modified.writelines(data)
 
 				# Generate an expected results Python file with jobName
-				shutil.copyfile(os.path.join(os.getcwd(), baseName + '_expected.py'), os.path.join(os.getcwd(), jobName + '_expected.py'))
+				expectedResultsFile = os.path.join(os.getcwd(), jobName + '_expected.py')
+				shutil.copyfile(os.path.join(os.getcwd(), baseName + '_expected.py'), expectedResultsFile)
+
+				# Update expected results if needed
+				with file(expectedResultsFile, 'r') as original:
+					data = original.readlines()
+				for p in parameters.keys():
+					for line in range(len(data)):
+						if re.search('.{0,}' + str(p) + '.{0,}=.{0,}$', data[line]) is not None:
+							data[line] = data[line].split('=')[0] + '= ' + str(parameters[p]) + '\n'
+							break
+				with file(expectedResultsFile, 'w') as modified:
+					modified.writelines(data)
 
 				# Save output to a log file
 				with open(os.path.join(os.getcwd(), 'testOutput', jobName + '.log'), 'w') as f:
@@ -316,6 +331,11 @@ class ParametricMetaClass(type):
 			testCases[i].update({'baseName': baseName})
 			if 'pythonScriptForModel' in dct:
 				testCases[i].update({'pythonScriptForModel': dct['pythonScriptForModel']})
+			if 'expectedpy_parameters' in dct:
+				exp_dict = {}
+				for k, v in  dct['expectedpy_parameters'].iteritems():
+					exp_dict[k] = v[i]
+				testCases[i].update(exp_dict)
 
 			# Add test functions to the testCase class
 			dct[testCases[i]['name']] = make_test_function(testCases[i])
