@@ -119,6 +119,8 @@ class TestCase(unittest.TestCase):
 		cmd = options.abaqusCmd + ' job=' + jobName
 		if not options.precompileCode:
 			cmd += ' user="' + userSubPath + '"'
+		if options.cpus > 1:
+			cmd += ' cpus=' + str(options.cpus)
 		cmd += ' double=both interactive'
 
 		# Copy parameters file, if it exists
@@ -363,6 +365,7 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 	parser.add_option("-s", "--specifyPathToSub", action="store", dest="relPathToUserSub", default=relPathToUserSub, help="Override path to user subroutine")
 	parser.add_option("-A", "--abaqusCmd", action="store", type="string", dest="abaqusCmd", default='abaqus', help="Override abaqus command; e.g. abq6141")
 	parser.add_option("-k", "--keepExistingOutputFiles", action="store_true", dest="keepExistingOutputFile", default=False, help="Does not delete existing files in the /testOutput directory")
+	parser.add_option("-C", "--cpus", action="store", type="int", dest="cpus", default=1, help="Specify the number of cpus to run abaqus jobs with")
 	(options, args) = parser.parse_args()
 
 	# Remove custom args so they do not get sent to unittest
@@ -379,7 +382,7 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 				raise ''
 			
 			# If the option has additional info (e.g. -A abq6141), remove both from argv
-			if option.type == "string":
+			if option.type in ["string", "int"]:
 				idx = sys.argv.index(x)
 				del sys.argv[idx:idx+2]
 			else:

@@ -115,26 +115,28 @@ tests $  python test_runner.py SingleElementTests.test_CPS4R_tension
 
 ## Command Line Options
 Various command line options can be used as described below.
-
-The option `-i` or equivalently `--interactive` can be specified to print the Abaqus log data to the terminal. For example:
+- `-A` or `--abaqusCmd` can be used to override the abaqus command to specify a particular version of abaqus. By default, the abaqus command is `abaqus`. Specify a string after the option to use a different version of abaqus. For example:
+```
+tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 -A abq6123
+```
+- `-c` or `--preCompileCode` can be specified to use `abaqus make` to compile the code into a binary before running one or more tests. A function that compiles the code must be provided to `abaverify` as an argument to the `runTests` function call in `test_runner.py`. The `usub_lib` option must be defined in the environment file.
+- `-C` or `--cpus` can be used to run abaqus jobs on more than one cpu. By default, abaqus jobs are run on one cpu. To specify more than one cpu, use a command like:
+```
+tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 -C 4
+```
+- `-e` or `--useExistingBinaries` can be specified to reuse the most recent compiled version of the code.
+- `-i` or `--interactive` can be specified to print the Abaqus log data to the terminal. For example:
 ```
 tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 --interactive
 ```
-
-The option `-t` or equivalently `--time` can be specified to print the run times for the compiler, packager, and solver to the terminal. For example:
+- `-r` or `--useExistingResults` can be specified to reuse the most recent test results. The net effect is that only the post-processing portion of the code is run, so you don't have to wait for the model to run just to debug a `_expected.py` file or `processresults.py`.
+- `-s` or equivalently `--specifyPathToSub` can be used to override the relative path to the user subroutine specified in the the call `av.runTests()` in your `test_runner.py` file.
+- `-t` or `--time` can be specified to print the run times for the compiler, packager, and solver to the terminal. For example:
 ```
 tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 --timer
 ```
 
-The option `-c` or equivalently `--preCompileCode` can be specified to use `abaqus make` to compile the code into a binary before running one or more tests. A function that compiles the code must be provided to `abaverify` as an argument to the `runTests` function call in `test_runner.py`. The `usub_lib` option must be defined in the environment file.
 
-The option `-e` or equivalently `--useExistingBinaries` can be specified to reuse the most recent compiled version of the code.
-
-The option `-r` or equivalently `--useExistingResults` can be specified to reuse the most recent test results. The net effect is that only the post-processing portion of the code is run, so you don't have to wait for the model to run just to debug a `_expected.py` file or `processresults.py`.
-
-The option `-s` or equivalently `--specifyPathToSub` can be used to override the relative path to the user subroutine specified in the the call `av.runTests()` in your `test_runner.py` file.
-
-The option `-A` or equivalently `--abaqusCmd` can be used to override the abaqus command to specify a particular version of abaqus. By default, the abaqus command is `abaqus`. Specify a string after the option to use a different version of abaqus. For example: `-A abq6123`.
 
 ## Results `type`
 A variety of different types of results can be extracted from the odbs and compared with reference values. A list of each support type and brief explanation are provided below:
