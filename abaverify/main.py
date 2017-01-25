@@ -13,6 +13,7 @@ import contextlib
 import itertools as it
 import time
 import inspect
+import getpass
 
 #
 # Local
@@ -89,11 +90,24 @@ class TestCase(unittest.TestCase):
 				self.runModel(jobName=jobName, f=f, timer=timer)
 
 			# Execute process_results script load ODB and get results
-			pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-			if not os.path.isfile(os.path.join(os.getcwd(), 'testOutput', jobName + '.odb')):
-				raise Exception("Error: Abaqus odb was not generated. Check the log file in the testOutput directory.")
-			pathForProcessResultsPy = '"' + os.path.join(pathForThisFile, 'processresults.py') + '"'
-			self.callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName, log=f, timer=timer)
+			if options.host == "localhost":
+				pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+				if not os.path.isfile(os.path.join(os.getcwd(), 'testOutput', jobName + '.odb')):
+					raise Exception("Error: Abaqus odb was not generated. Check the log file in the testOutput directory.")
+				pathForProcessResultsPy = '"' + os.path.join(pathForThisFile, 'processresults.py') + '"'
+				self.callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName, log=f, timer=timer)
+
+			else: # Remote host
+				self.callAbaqusOnRemote(cmd=options.abaqusCmd + ' cae noGUI=processresults.py -- -- ' + jobName, log=f, timer=timer)
+				try:
+					ftp = options.ssh.open_sftp()
+					ftp.chdir(options.remote_run_dir)
+					ftp.get(jobName + '_results.py', 'testOutput/' + jobName + '_results.py')
+					if options.remote['copy_results_to_local']:
+						for ext in ['.dat', '.msg', '.odb', '.sta']:
+							ftp.get(jobName + ext, 'testOutput/' + jobName + ext)
+				finally:
+					ftp.close()
 
 		# Run assertions
 		self.runAssertionsOnResults(jobName)
@@ -104,16 +118,33 @@ class TestCase(unittest.TestCase):
 		Logic to submit the abaqus job
 		"""
 
-		# Platform specific file extension for user subroutine
 		if not options.precompileCode:
-			if (platform.system() == 'Linux'):
-				subext = '.f'
+			# Platform specific file extension for user subroutine
+			if options.host == "localhost":
+				if platform.system() == 'Linux':
+					subext = '.f'
+				else:
+					subext = '.for'
 			else:
-				subext = '.for'
-			userSubPath = os.path.join(os.getcwd(), options.relPathToUserSub + subext)
+				subext = '.f'
+
+			# Path to user subroutine
+			if options.host == "localhost":
+				userSubPath = os.path.join(os.getcwd(), options.relPathToUserSub + subext)
+			else:
+				userSubPath = os.path.basename(options.relPathToUserSub) + subext
 
 		# Copy input deck
-		shutil.copyfile(os.path.join(os.getcwd(), jobName + '.inp'), os.path.join(os.getcwd(), 'testOutput', jobName + '.inp'))
+		if options.host == "localhost":
+			shutil.copyfile(os.path.join(os.getcwd(), jobName + '.inp'), os.path.join(os.getcwd(), 'testOutput', jobName + '.inp'))
+		else:
+			try:
+				ftp = options.ssh.open_sftp()
+				ftp.chdir(options.remote_run_dir)
+				ftp.put(jobName + '.inp', jobName + '.inp')
+				ftp.put(jobName + '_expected.py', jobName + '_expected.py')
+			finally:
+				ftp.close()
 
 		# build abaqus cmd
 		cmd = options.abaqusCmd + ' job=' + jobName
@@ -124,16 +155,19 @@ class TestCase(unittest.TestCase):
 		cmd += ' double=both interactive'
 
 		# Copy parameters file, if it exists
-		parameterName = 'CompDam.parameters'
-		parameterPath = os.path.join(os.getcwd(), parameterName)
-		if os.path.exists(parameterPath):
-			shutil.copyfile(parameterPath, os.path.join(os.getcwd(), 'testOutput', parameterName))
+		if options.host == "localhost":
+			parameterName = 'CompDam.parameters'
+			parameterPath = os.path.join(os.getcwd(), parameterName)
+			if os.path.exists(parameterPath):
+				shutil.copyfile(parameterPath, os.path.join(os.getcwd(), 'testOutput', parameterName))
 
 		# Run the test from the testOutput directory
-		os.chdir(os.path.join(os.getcwd(), 'testOutput'))
-		self.callAbaqus(cmd=cmd, log=f, timer=timer)
-
-		os.chdir(os.pardir)
+		if options.host == "localhost":
+			os.chdir(os.path.join(os.getcwd(), 'testOutput'))
+			self.callAbaqus(cmd=cmd, log=f, timer=timer)
+			os.chdir(os.pardir)
+		else:
+			self.callAbaqusOnRemote(cmd=cmd, log=f, timer=timer)
 
 
 	def runAssertionsOnResults(self, jobName):
@@ -187,6 +221,27 @@ class TestCase(unittest.TestCase):
 				print line
 
 
+	def callAbaqusOnRemote(self, cmd, log, timer=None):
+		"""
+		Logic for calls to abaqus on a remote server. Support streaming the output to the log file.
+		"""
+
+		stdin, stdout, stderr = options.ssh.exec_command('cd ' + options.remote_run_dir + '; ' + cmd)
+		stdin.close()
+		for line in iter(lambda: stdout.readline(2048), ""):
+
+			# Time tests
+			if options.time:
+				if timer != None:
+					timer.processLine(line)
+
+			# Log data
+			log.write(line)
+			if options.interactive:
+				print line
+				sys.stdout.flush()
+
+
 	def outputStreamer(self, proc, stream='stdout'):
 		"""
 		Hanldes streaming of subprocess.
@@ -238,72 +293,87 @@ class ParametricMetaClass(type):
 
 			def test(self):
 
-				# Create the input deck
-				# Copy the template input file
-				if 'pythonScriptForModel' in testCase:
-					inpFilePath = os.path.join(os.getcwd(), jobName + '.py')
-					shutil.copyfile(os.path.join(os.getcwd(), baseName + '.py'), inpFilePath)
-				else:
-					inpFilePath = os.path.join(os.getcwd(), jobName + '.inp')
-					shutil.copyfile(os.path.join(os.getcwd(), baseName + '.inp'), inpFilePath)
-
-				# Update all of the relevant *Parameter terms in the Abaqus input deck
-				with file(inpFilePath, 'r') as original:
-					data = original.readlines()
-				for p in parameters.keys():
-					for line in range(len(data)):
-						if re.search('.{0,}' + str(p) + '.{0,}=.{0,}$', data[line]) is not None:
-							data[line] = data[line].split('=')[0] + '= ' + str(parameters[p]) + '\n'
-							break
-				with file(inpFilePath, 'w') as modified:
-					modified.writelines(data)
-
-				# Generate an expected results Python file with jobName
-				expectedResultsFile = os.path.join(os.getcwd(), jobName + '_expected.py')
-				shutil.copyfile(os.path.join(os.getcwd(), baseName + '_expected.py'), expectedResultsFile)
-
-				# Update expected results if needed
-				with file(expectedResultsFile, 'r') as original:
-					data = original.readlines()
-				for p in parameters.keys():
-					for line in range(len(data)):
-						if re.search('.{0,}' + str(p) + '.{0,}=.{0,}$', data[line]) is not None:
-							data[line] = data[line].split('=')[0] + '= ' + str(parameters[p]) + '\n'
-							break
-				with file(expectedResultsFile, 'w') as modified:
-					modified.writelines(data)
-
-				# Save output to a log file
-				with open(os.path.join(os.getcwd(), 'testOutput', jobName + '.log'), 'w') as f:
-
-					# Generate input file from python script
+				try:
+					# Create the input deck
+					# Copy the template input file
 					if 'pythonScriptForModel' in testCase:
-						self.callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + inpFilePath, log=f)
-
-					# Time tests
-					if options.time:
-						timer = measureRunTimes()
+						inpFilePath = os.path.join(os.getcwd(), jobName + '.py')
+						shutil.copyfile(os.path.join(os.getcwd(), baseName + '.py'), inpFilePath)
 					else:
-						timer = None
+						inpFilePath = os.path.join(os.getcwd(), jobName + '.inp')
+						shutil.copyfile(os.path.join(os.getcwd(), baseName + '.inp'), inpFilePath)
 
-					# Execute the solver
-					if not options.useExistingResults:
-						self.runModel(jobName=jobName, f=f, timer=timer)
+					# Update all of the relevant *Parameter terms in the Abaqus input deck
+					with file(inpFilePath, 'r') as original:
+						data = original.readlines()
+					for p in parameters.keys():
+						for line in range(len(data)):
+							if re.search('.{0,}' + str(p) + '.{0,}=.{0,}$', data[line]) is not None:
+								data[line] = data[line].split('=')[0] + '= ' + str(parameters[p]) + '\n'
+								break
+					with file(inpFilePath, 'w') as modified:
+						modified.writelines(data)
 
-					# Execute process_results script load ODB and get results
-					pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-					if not os.path.isfile(os.path.join(os.getcwd(), 'testOutput', jobName + '.odb')):
-						raise Exception("Error: Abaqus odb was not generated. Check the log file in the testOutput directory.")
-					pathForProcessResultsPy = '"' + os.path.join(pathForThisFile, 'processresults.py') + '"'
-					self.callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName, log=f, timer=timer)
+					# Generate an expected results Python file with jobName
+					expectedResultsFile = os.path.join(os.getcwd(), jobName + '_expected.py')
+					shutil.copyfile(os.path.join(os.getcwd(), baseName + '_expected.py'), expectedResultsFile)
 
-				os.remove(jobName + '.inp')  # Delete temporary parametric input file
-				os.remove(jobName + '_expected.py') # Delete temporary parametric expected results file
-				if 'pythonScriptForModel' in testCase:
-					os.remove(jobName + '.py')
+					# Update expected results if needed
+					with file(expectedResultsFile, 'r') as original:
+						data = original.readlines()
+					for p in parameters.keys():
+						for line in range(len(data)):
+							if re.search('.{0,}' + str(p) + '.{0,}=.{0,}$', data[line]) is not None:
+								data[line] = data[line].split('=')[0] + '= ' + str(parameters[p]) + '\n'
+								break
+					with file(expectedResultsFile, 'w') as modified:
+						modified.writelines(data)
 
-				# Run assertions
-				self.runAssertionsOnResults(jobName)
+					# Save output to a log file
+					with open(os.path.join(os.getcwd(), 'testOutput', jobName + '.log'), 'w') as f:
+
+						# Generate input file from python script
+						if 'pythonScriptForModel' in testCase:
+							self.callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + inpFilePath, log=f)
+
+						# Time tests
+						if options.time:
+							timer = measureRunTimes()
+						else:
+							timer = None
+
+						# Execute the solver
+						if not options.useExistingResults:
+							self.runModel(jobName=jobName, f=f, timer=timer)
+
+						# Execute process_results script load ODB and get results
+						if options.host == "localhost":
+							pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+							if not os.path.isfile(os.path.join(os.getcwd(), 'testOutput', jobName + '.odb')):
+								raise Exception("Error: Abaqus odb was not generated. Check the log file in the testOutput directory.")
+							pathForProcessResultsPy = '"' + os.path.join(pathForThisFile, 'processresults.py') + '"'
+							self.callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName, log=f, timer=timer)
+
+						else: # Remote host
+							self.callAbaqusOnRemote(cmd=options.abaqusCmd + ' cae noGUI=processresults.py -- -- ' + jobName, log=f, timer=timer)
+							try:
+								ftp = options.ssh.open_sftp()
+								ftp.chdir(options.remote_run_dir)
+								ftp.get(jobName + '_results.py', 'testOutput/' + jobName + '_results.py')
+								if options.remote['copy_results_to_local']:
+									for ext in ['.dat', '.msg', '.odb', '.sta']:
+										ftp.get(jobName + ext, 'testOutput/' + jobName + ext)
+							finally:
+								ftp.close()
+
+					# Run assertions
+					self.runAssertionsOnResults(jobName)
+
+				finally:  # Make sure temporary files are removed
+					os.remove(jobName + '.inp')  # Delete temporary parametric input file
+					os.remove(jobName + '_expected.py') # Delete temporary parametric expected results file
+					if 'pythonScriptForModel' in testCase:
+						os.remove(jobName + '.py')
 
 
 			# Rename the test method and return the test
@@ -366,6 +436,7 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 	parser.add_option("-A", "--abaqusCmd", action="store", type="string", dest="abaqusCmd", default='abaqus', help="Override abaqus command; e.g. abq6141")
 	parser.add_option("-k", "--keepExistingOutputFiles", action="store_true", dest="keepExistingOutputFile", default=False, help="Does not delete existing files in the /testOutput directory")
 	parser.add_option("-C", "--cpus", action="store", type="int", dest="cpus", default=1, help="Specify the number of cpus to run abaqus jobs with")
+	parser.add_option("-R", "--remoteHost", action="store", type="string", dest="host", default="localhost", help="Run on remote host; e.g. user@server.com[:port][/path/to/run/dir]. Default run dir is <login_dir>/abaverify_temp/")
 	(options, args) = parser.parse_args()
 
 	# Remove custom args so they do not get sent to unittest
@@ -388,125 +459,254 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 			else:
 				sys.argv.remove(x)
 			
+	# Remote host
+	#
+	# USE PARAMIKO for communication with remote host
+	# Installation: 
+	#   http://www.paramiko.org/installing.html
+	#   http://stackoverflow.com/questions/20538685/install-paramiko-on-windows
+	# Docs
+	#   http://docs.paramiko.org/en/2.1/
+	#   http://jessenoller.com/blog/2009/02/05/ssh-programming-with-paramiko-completely-different     <-- search google, doesn't load from url for some weird reason
+	
+	if options.host != "localhost":
+		# Compatibility with other options
+		if options.precompileCode:
+			raise Exception("The -c option is not supported with -R")
+		if options.useExistingBinaries:
+			raise Exception("The -e option is not supported with -R")
+		if options.useExistingResults:
+			raise Exception("The -r option is not supported with -R")
+		if options.keepExistingOutputFile:
+			raise Exception("The -k option is not supported with -R")
 
-	# Remove rpy files
-	testPath = os.getcwd()
-	pattern = re.compile('^abaqus\.rpy(\.)*([0-9])*$')
-	for f in os.listdir(testPath):
-		if pattern.match(f):
-			os.remove(os.path.join(os.getcwd(), f))
+		# Make sure running on windows and plink is available
+		if platform.system() != "Windows":
+			raise Exception("The -R option is only supported for Windows")
+		try:
+			import paramiko
+			ssh = paramiko.SSHClient()
+		except:
+			raise Exception("Failed to load paramiko. Please make sure that paramiko is installed and configured")
 
-	# Remove old binaries
-	if not options.useExistingBinaries:
-		if os.path.isdir(os.path.join(os.pardir, 'build')):
-			for f in os.listdir(os.path.join(os.pardir, 'build')):
-				os.remove(os.path.join(os.pardir, 'build', f))
+		# Load remote options
+		try:
+			import abaverify_remote_options as aro
+			user_defined_attributes = [attr for attr in dir(aro) if '__' not in attr]
+			remote_opts = {attr: getattr(aro, attr) for attr in user_defined_attributes}
+			setattr(options, 'remote', remote_opts)
+		except:
+			# Set defaults
+			remote_opts = dict()
+			remote_opts['local_files_to_copy_to_remote'] = []
+			remote_opts['copy_results_to_local'] = False
+			remote_opts['environment_file_name'] = 'abaqus_v6_remote.env'
+			setattr(options, 'remote', remote_opts)
 
-	# If testOutput doesn't exist, create it
-	testOutputPath = os.path.join(os.getcwd(), 'testOutput')
-	if not os.path.isdir(testOutputPath) and options.useExistingResults:
-		raise Exception("There must be results in the testOutput directory to use the --useExistingResults (-r) option")
-	if not os.path.isdir(testOutputPath):
-		os.makedirs(testOutputPath)
-
-	# Remove old job files
-	if not options.useExistingResults:
-		if not options.keepExistingOutputFile:
-			testOutputPath = os.path.join(os.getcwd(), 'testOutput')
-			pattern = re.compile('.*\.env$')
-			for f in os.listdir(testOutputPath):
-				if not pattern.match(f):
-					os.remove(os.path.join(os.getcwd(), 'testOutput', f))
+		# Check for optional path to a run directory
+		match = re.search(r'^([A-Za-z0-9\-\.]+)@([A-Za-z0-9\-\.]+):?([0-9]+)?(.*)$', options.host)
+		if match:
+			userName = match.group(1)
+			fqdn = match.group(2)
+			port = match.group(3)
+			runDir = match.group(4)
 		else:
-			# Check for files with the same name to avoid overwriting
-			# This is a bit of pain
-			# Process:
-			# 1. Check if args any are classes in the calling file that are specified as arguments
-			classesInCallingFile = {}
-			# Get the calling file
-			frame = inspect.stack()[1]
-			# Get the classes in the calling file
-			for name, obj in inspect.getmembers(inspect.getmodule(frame[0])):
-				if inspect.isclass(obj) and issubclass(obj, TestCase):
-					classesInCallingFile[obj.__name__] = obj
-			calledClasses = list(set(sys.argv[1:]).intersection(classesInCallingFile.keys()))
+			raise ValueError("Unable to understand the specified host " + options.host + "; please use proper formatting.")
+		# Set default run directory
+		if not runDir:
+			runDir = 'abaverify_temp'
+		if not port:
+			port = 22
+		setattr(options, 'remote_run_dir', runDir)
 
-			# 2. Build a list of test_ methods that will be called
-			calledMethods = []
+		# Gather required information
+		pw = getpass.getpass('Enter the password for ' + userName + "@" + fqdn + ': ')
 
-			# 3. Get test_ methods from the class(es) that are called
-			for c in calledClasses:
-				for name, obj in inspect.getmembers(classesInCallingFile[c], predicate=inspect.ismethod):
-					if 'test_' in name:
-						calledMethods.append(name)
+		# Connect to the remote host
+		ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+		ssh.connect(fqdn, port=port, username=userName, password=pw)
+		setattr(options, 'ssh', ssh)
 
-			# 4. Get test_ methods list explicity in the arguments
-			for arg in sys.argv[1:]:
-				if len(arg.split('.')) == 2:
-					testName = arg.split('.')[1]
-					if 'test' in testName:
-						calledMethods.append(testName)
-			
-			# Now we have a list of the test methods that will be called
-			# print calledMethods
+		# Clear the run directory
+		stdin, stdout, stderr = ssh.exec_command("ls " + runDir)
+		err = stderr.readlines()
+		if len(err):
+			if "No such file or directory" in err[0]:
+				stdin, stdout, stderr = ssh.exec_command("mkdir " + runDir)
+			else:
+				ssh.close()
+				raise Exception("Unknown error on remote when searching for run directory.")
+		stdin, stdout, stderr = ssh.exec_command("rm -rf " + runDir + "/*")
 
-			# Get a list of unique file names begining with 'test' in testOutput directory (w/o file extensions)
-			uniquefileNames = list(set([f.split('.')[0] for f in os.listdir(testOutputPath) if 'test_' in f]))
+		# Transfer files to the run directory
+		try:
+			ftp = ssh.open_sftp()
+			ftp.chdir(runDir)
 
-			# Check if any files exist in testOutput with these test names
-			testsToBeOverwritten = list(set(uniquefileNames).intersection(calledMethods))
-			if len(testsToBeOverwritten) > 0:
-				raise Exception("Cannot overwrite the following tests {0}".format(str(testsToBeOverwritten)))
+			# Fortran source files
+			source_file_dir = os.path.dirname(options.relPathToUserSub)
+			sourceFiles = [os.path.join(os.path.dirname(options.relPathToUserSub), f) for f in os.listdir(source_file_dir)]
+			for sourceFile in sourceFiles:
+				print "Copying: " + os.path.abspath(sourceFile)
+				ftp.put(sourceFile, os.path.basename(sourceFile))
+
+			# Make sure there's a symbolic link on the remote so that abaqus doesn't complain about .f and .for
+			subroutine_file_name = os.path.basename(options.relPathToUserSub)
+			if subroutine_file_name + '.f' not in os.listdir(source_file_dir):
+				ssh.exec_command('cd ' + options.remote_run_dir + '; ' + 'ln -s ' + subroutine_file_name + '.for ' + subroutine_file_name + '.f')
+
+			# Environment file (expects naming convention: abaqus_v6_remote.env)
+			env_file_name = options.remote['environment_file_name']
+			if os.path.isfile(os.path.join(os.getcwd(), env_file_name)):
+				print "Copying: " + os.path.abspath(env_file_name)
+				ftp.put(env_file_name, 'abaqus_v6.env')
+
+			# abaverify_remote_options
+			if 'local_files_to_copy_to_remote' in options.remote:
+				for f in options.remote['local_files_to_copy_to_remote']:
+					print "Copying: " + os.path.abspath(f)
+					ftp.put(f, os.path.basename(f))
+
+			# abaverify processresults.py
+			pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+			pathForProcessResultsPy = os.path.join(pathForThisFile, 'processresults.py')
+			print "Copying: " + pathForProcessResultsPy
+			ftp.put(pathForProcessResultsPy, 'processresults.py')
+
+		finally:
+			ftp.close()
+
+		# Make sure testOutput exists and that its empty.
+		testOutputPath = os.path.join(os.getcwd(), 'testOutput')
+		if not os.path.isdir(testOutputPath):
+			os.makedirs(testOutputPath)
+		for f in os.listdir(testOutputPath):
+			os.remove(os.path.join(os.getcwd(), 'testOutput', f))
 
 
-		# Try to pre-compile the code
+	else: # Run on local host
+
+		# Remove rpy files
+		testPath = os.getcwd()
+		pattern = re.compile('^abaqus\.rpy(\.)*([0-9])*$')
+		for f in os.listdir(testPath):
+			if pattern.match(f):
+				os.remove(os.path.join(os.getcwd(), f))
+
+		# Remove old binaries
 		if not options.useExistingBinaries:
-			wd = os.getcwd()
-			if options.precompileCode:
-				try:
-					compileCodeFunc()
-				except:
-					print "ERROR: abaqus make failed.", sys.exc_info()[0]
-					raise Exception("Error compiling with abaqus make. Look for 'compile.log' in the testOutput directory. Or try running 'abaqus make library=CompDam_DGD' from the /for directory to debug.")
-					os.chdir(wd)
+			if os.path.isdir(os.path.join(os.pardir, 'build')):
+				for f in os.listdir(os.path.join(os.pardir, 'build')):
+					os.remove(os.path.join(os.pardir, 'build', f))
 
-		# Make sure
-		# 1) environment file exists
-		# 2) it has usub_lib_dir
-		# 3) usub_lib_dir is the location where the binaries reside
-		# 4) a copy is in testOutput
-		if os.path.isfile(os.path.join(os.getcwd(), 'abaqus_v6.env')):
-			# Make sure it has usub_lib_dir
-			if options.precompileCode:
-				with open(os.path.join(os.getcwd(), 'abaqus_v6.env'), 'r+') as envFile:
-					foundusub = False
-					pattern_usub = re.compile('^usub_lib_dir.*')
-					for line in envFile:
-						if pattern_usub.match(line):
-							print "Found usub_lib_dir"
-							pathInEnvFile = re.findall('= "(.*)"$', line).pop()
-							if pathInEnvFile:
-								if pathInEnvFile == '/'.join(os.path.abspath(os.path.join(os.pardir, 'build')).split('\\')): # Note that this nonsense is because abaqus wants '/' as os.sep even on windows
-									foundusub = True
-									break
+		# If testOutput doesn't exist, create it
+		testOutputPath = os.path.join(os.getcwd(), 'testOutput')
+		if not os.path.isdir(testOutputPath) and options.useExistingResults:
+			raise Exception("There must be results in the testOutput directory to use the --useExistingResults (-r) option")
+		if not os.path.isdir(testOutputPath):
+			os.makedirs(testOutputPath)
+
+		# Remove old job files
+		if not options.useExistingResults:
+			if not options.keepExistingOutputFile:
+				testOutputPath = os.path.join(os.getcwd(), 'testOutput')
+				pattern = re.compile('.*\.env$')
+				for f in os.listdir(testOutputPath):
+					if not pattern.match(f):
+						os.remove(os.path.join(os.getcwd(), 'testOutput', f))
+			else:
+				# Check for files with the same name to avoid overwriting
+				# This is a bit of pain
+				# Process:
+				# 1. Check if args any are classes in the calling file that are specified as arguments
+				classesInCallingFile = {}
+				# Get the calling file
+				frame = inspect.stack()[1]
+				# Get the classes in the calling file
+				for name, obj in inspect.getmembers(inspect.getmodule(frame[0])):
+					if inspect.isclass(obj) and issubclass(obj, TestCase):
+						classesInCallingFile[obj.__name__] = obj
+				calledClasses = list(set(sys.argv[1:]).intersection(classesInCallingFile.keys()))
+
+				# 2. Build a list of test_ methods that will be called
+				calledMethods = []
+
+				# 3. Get test_ methods from the class(es) that are called
+				for c in calledClasses:
+					for name, obj in inspect.getmembers(classesInCallingFile[c], predicate=inspect.ismethod):
+						if 'test_' in name:
+							calledMethods.append(name)
+
+				# 4. Get test_ methods list explicity in the arguments
+				for arg in sys.argv[1:]:
+					if len(arg.split('.')) == 2:
+						testName = arg.split('.')[1]
+						if 'test' in testName:
+							calledMethods.append(testName)
+				
+				# Now we have a list of the test methods that will be called
+				# print calledMethods
+
+				# Get a list of unique file names begining with 'test' in testOutput directory (w/o file extensions)
+				uniquefileNames = list(set([f.split('.')[0] for f in os.listdir(testOutputPath) if 'test_' in f]))
+
+				# Check if any files exist in testOutput with these test names
+				testsToBeOverwritten = list(set(uniquefileNames).intersection(calledMethods))
+				if len(testsToBeOverwritten) > 0:
+					raise Exception("Cannot overwrite the following tests {0}".format(str(testsToBeOverwritten)))
+
+
+			# Try to pre-compile the code
+			if not options.useExistingBinaries:
+				wd = os.getcwd()
+				if options.precompileCode:
+					try:
+						compileCodeFunc()
+					except:
+						print "ERROR: abaqus make failed.", sys.exc_info()[0]
+						raise Exception("Error compiling with abaqus make. Look for 'compile.log' in the testOutput directory. Or try running 'abaqus make library=CompDam_DGD' from the /for directory to debug.")
+						os.chdir(wd)
+
+			# Make sure
+			# 1) environment file exists
+			# 2) it has usub_lib_dir
+			# 3) usub_lib_dir is the location where the binaries reside
+			# 4) a copy is in testOutput
+			if os.path.isfile(os.path.join(os.getcwd(), 'abaqus_v6.env')):
+				# Make sure it has usub_lib_dir
+				if options.precompileCode:
+					with open(os.path.join(os.getcwd(), 'abaqus_v6.env'), 'r+') as envFile:
+						foundusub = False
+						pattern_usub = re.compile('^usub_lib_dir.*')
+						for line in envFile:
+							if pattern_usub.match(line):
+								print "Found usub_lib_dir"
+								pathInEnvFile = re.findall('= "(.*)"$', line).pop()
+								if pathInEnvFile:
+									if pathInEnvFile == '/'.join(os.path.abspath(os.path.join(os.pardir, 'build')).split('\\')): # Note that this nonsense is because abaqus wants '/' as os.sep even on windows
+										foundusub = True
+										break
+									else:
+										raise Exception("ERROR: a usub_lib_dir is specified in the environment file that is different from the build location.")
 								else:
-									raise Exception("ERROR: a usub_lib_dir is specified in the environment file that is different from the build location.")
-							else:
-								raise Exception("ERROR: logic to parse the environment file looking for usub_lib_dir failed.")
+									raise Exception("ERROR: logic to parse the environment file looking for usub_lib_dir failed.")
 
-				# Add usub_lib_dir if it was not found
-				if not foundusub:
-					print "Adding usub_lib_dir to environment file."
-					with open(os.path.join(os.getcwd(), 'abaqus_v6.env'), 'a') as envFile:
-						pathWithForwardSlashes = '/'.join(os.path.abspath(os.path.join(os.pardir, 'build')).split('\\'))
-						print pathWithForwardSlashes
-						envFile.write('\nimport os\nusub_lib_dir = "' + pathWithForwardSlashes + '"\ndel os\n')
+					# Add usub_lib_dir if it was not found
+					if not foundusub:
+						print "Adding usub_lib_dir to environment file."
+						with open(os.path.join(os.getcwd(), 'abaqus_v6.env'), 'a') as envFile:
+							pathWithForwardSlashes = '/'.join(os.path.abspath(os.path.join(os.pardir, 'build')).split('\\'))
+							print pathWithForwardSlashes
+							envFile.write('\nimport os\nusub_lib_dir = "' + pathWithForwardSlashes + '"\ndel os\n')
 
-			# Copy to /test/testOutput
-			shutil.copyfile(os.path.join(os.getcwd(), 'abaqus_v6.env'), os.path.join(os.getcwd(), 'testOutput', 'abaqus_v6.env'))
-		else:
-			raise Exception("Missing environment file. Please configure a local abaqus environement file. See getting started in readme.")
+				# Copy to /test/testOutput
+				shutil.copyfile(os.path.join(os.getcwd(), 'abaqus_v6.env'), os.path.join(os.getcwd(), 'testOutput', 'abaqus_v6.env'))
+			else:
+				raise Exception("Missing environment file. Please configure a local abaqus environement file. See getting started in readme.")
 
 
-
-	unittest.main(verbosity=2)
+	try:
+		unittest.main(verbosity=2)
+	finally:
+		if options.host != "localhost":
+			ssh.close()

@@ -325,7 +325,8 @@ jobName = sys.argv[-1]
 para = __import__(jobName + '_expected').parameters
 
 # Change working directory to testOutput and put a copy of the input file in testOutput
-os.chdir(os.path.join(os.getcwd(), 'testOutput'))
+if jobName + '.odb' not in os.listdir(os.getcwd()):
+    os.chdir(os.path.join(os.getcwd(), 'testOutput'))
 
 # Load ODB
 odb = session.openOdb(name=os.path.join(os.getcwd(), jobName + '.odb'), readOnly=False)
