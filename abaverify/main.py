@@ -14,6 +14,7 @@ import itertools as it
 import time
 import inspect
 import getpass
+import datetime
 
 #
 # Local
@@ -51,6 +52,9 @@ class measureRunTimes:
 			self.solver_end = time.time()
 			self.solver_time = self.solver_end - self.solver_start
 			sys.stderr.write("Solver run time: {:.2f} s\n".format(self.solver_time))
+
+def versiontuple(v):
+    return tuple(map(int, (v.split("."))))
 
 
 #
@@ -91,10 +95,9 @@ class TestCase(unittest.TestCase):
 
 			# Execute process_results script load ODB and get results
 			if options.host == "localhost":
-				pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 				if not os.path.isfile(os.path.join(os.getcwd(), 'testOutput', jobName + '.odb')):
 					raise Exception("Error: Abaqus odb was not generated. Check the log file in the testOutput directory.")
-				pathForProcessResultsPy = '"' + os.path.join(pathForThisFile, 'processresults.py') + '"'
+				pathForProcessResultsPy = '"' + os.path.join(ABAVERIFY_INSTALL_DIR, 'processresults.py') + '"'
 				self.callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName, log=f, timer=timer)
 
 			else: # Remote host
@@ -348,10 +351,9 @@ class ParametricMetaClass(type):
 
 						# Execute process_results script load ODB and get results
 						if options.host == "localhost":
-							pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 							if not os.path.isfile(os.path.join(os.getcwd(), 'testOutput', jobName + '.odb')):
 								raise Exception("Error: Abaqus odb was not generated. Check the log file in the testOutput directory.")
-							pathForProcessResultsPy = '"' + os.path.join(pathForThisFile, 'processresults.py') + '"'
+							pathForProcessResultsPy = '"' + os.path.join(ABAVERIFY_INSTALL_DIR, 'processresults.py') + '"'
 							self.callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName, log=f, timer=timer)
 
 						else: # Remote host
@@ -423,7 +425,12 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 	desired. By default the subroutine is compiled at every test execution.
 	"""
 
+	global ABAVERIFY_INSTALL_DIR
 	global options
+
+
+	# Directory where this file is located
+	ABAVERIFY_INSTALL_DIR = os.path.dirname(os.path.abspath(__file__))
 
 	# Command line options
 	parser = OptionParser()
@@ -458,7 +465,40 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 				del sys.argv[idx:idx+2]
 			else:
 				sys.argv.remove(x)
-			
+	
+
+	# Check version of script and notify the user if its out of date
+	path_to_latest_ver_file = os.path.join(ABAVERIFY_INSTALL_DIR, 'latest.txt')
+	lastModified = datetime.datetime.fromtimestamp(os.path.getmtime(path_to_latest_ver_file))
+	if (datetime.datetime.now() - lastModified).days > 1:
+		# Update version file
+		try:
+			import json
+			import urllib2
+			response = urllib2.urlopen('https://api.github.com/repos/nasa/abaverify/releases/latest')
+			data = json.load(response)
+			tag = data['tag_name']
+			latest_version = tag[1:]
+			with open(path_to_latest_ver_file, "w") as h:
+				h.write(latest_version)
+			# with open(os.path.join(ABAVERIFY_INSTALL_DIR, 'latest.txt'),'r') as f:
+			# 	output = f.read()
+		except:
+			pass
+
+		# Load current version
+		current_version = "v0.0.0"
+		version_file_as_str = open(os.path.join(ABAVERIFY_INSTALL_DIR, "_version.py"), "rt").read()
+		version_re = r"^__version__ = ['\"]([^'\"]*)['\"]"
+		match = re.search(version_re, version_file_as_str, re.M)
+		if match:
+			current_version = match.group(1)
+
+		# Compare versions
+		if versiontuple("0.3.0") > versiontuple(current_version):
+			print "  NOTICE: Version {0} of abaverify available, consider upgrading from your current version ({1})".format(latest_version, current_version)
+
+
 	# Remote host
 	#
 	# USE PARAMIKO for communication with remote host
@@ -487,7 +527,7 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 			import paramiko
 			ssh = paramiko.SSHClient()
 		except:
-			raise Exception("Failed to load paramiko. Please make sure that paramiko is installed and configured")
+			raise Exception("Failed to load paramiko. The -R option requires Paramiko. Please make sure that paramiko is installed and configured")
 
 		# Load remote options
 		try:
@@ -568,8 +608,7 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 					ftp.put(f, os.path.basename(f))
 
 			# abaverify processresults.py
-			pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-			pathForProcessResultsPy = os.path.join(pathForThisFile, 'processresults.py')
+			pathForProcessResultsPy = os.path.join(ABAVERIFY_INSTALL_DIR, 'processresults.py')
 			print "Copying: " + pathForProcessResultsPy
 			ftp.put(pathForProcessResultsPy, 'processresults.py')
 

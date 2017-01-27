@@ -1,13 +1,3 @@
-# This is a crude hack so that we can import the abaverify module for testing purposes
-# Normal usage of abaverify does not require this
-import inspect
-import os
-import sys
-pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-pathToAbaverifyDir = os.path.join(pathForThisFile, os.pardir, os.pardir)
-sys.path.insert(0, pathToAbaverifyDir)
-
-# Normal import line
 import abaverify as av
 
 
