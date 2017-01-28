@@ -10,9 +10,9 @@ For any questions, please contact the developers:
 - Frank Leone   | [frank.a.leone@nasa.gov](mailto:frank.a.leone@nasa.gov)     | (W) 757-864-3050
 
 ## Getting-Started
-This package assumes that you have `python 2.7` and `git` installed. This packaged is designed for Abaqus 2016 and it has been used successfully with v6.14; it may or may not work with older versions. It also assumes that you have an Abaqus user subroutine in a git repository with a minimum directory structure as shown here:
+This package assumes that you have `python 2.x` and `git` installed. This packaged is designed for Abaqus 2016 and it has been used successfully with v6.14; it may or may not work with older versions. It also assumes that you have an Abaqus user subroutine in a git repository with a minimum directory structure as shown here:
 ```
-.
+repo_dir/
     .git/
     for/
         usub.for
@@ -29,10 +29,18 @@ This package assumes that you have `python 2.7` and `git` installed. This packag
 The user subroutine is stored in the `for/` directory and the verification tests are stored in the `<your_userSubroutine_repo_dir>/tests/` directory.
 
 ### Install `abaverify`
-Install `abaverify` by executing one of the following commands from the `tests/` directory:
+Abaverify can be installed using the python utility `pip` (8.x+). The following sections provide a short summary of how to use `pip` to install `abaverify`. Clone `abaverify` into a convienent directory:
 ```
-tests $  git clone https://developer.nasa.gov/struct-mech/abaverify.git
+$  git clone https://developer.nasa.gov/struct-mech/abaverify.git
 ```
+Then install using the `-e` option:
+```
+$  pip install -e path/to/abaverifyDir
+```
+
+That's it.
+
+If install fails with errors indicating an issue with `paramiko` or `cryptography`, see the [`paramiko` installation guide](http://www.paramiko.org/installing.html) for troubleshooting.
 
 The remainder of this section describes how to build your own tests using `abaverify` (e.g., what goes inside the `test_model1.inp`, `test_model1_expected.py`, and `test_runner.py`) files. For a working example, checkout the sample verification test in the `abaverify/tests/tests/` directory. You can run the sample test with the command `python test_runner.py` from the `abaverify/tests/tests/` directory. Note, the default environment file (`abaverify/tests/tests`) is formatted for windows; linux users will need to modify the default environment file to the linux format.
 
@@ -97,7 +105,7 @@ The results array can contain as many result objects as needed to verify that th
 The file `sample_usage.py` gives an example of how you call your newly created tests. By convention, this file is named as `test_runner.py`. This file must include:
 
 1. `import abaverify`.
-2. classes that inherit `av.TestCase` and define functions beginning with `test` following the usage of `unittest`. See the `sample_usage.py` for an example.
+2. classes that inherit `abaverify.TestCase` and define functions beginning with `test` following the usage of `unittest`. See the `sample_usage.py` for an example.
 3. call to `runTests()` which takes one argument: the relative path to your user subroutine (omit the `.f` or `.for` ending, the code automatically appends it).
 
 ### Running your tests
@@ -128,11 +136,11 @@ tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 -C 4
 - `-e` or `--useExistingBinaries` can be specified to reuse the most recent compiled version of the code.
 - `-i` or `--interactive` can be specified to print the Abaqus log data to the terminal. For example:
 - `-r` or `--useExistingResults` can be specified to reuse the most recent test results. The net effect is that only the post-processing portion of the code is run, so you don't have to wait for the model to run just to debug a `_expected.py` file or `processresults.py`.
-- `-R` or `--remoteHost` can be specified to run the tests on a remote host, where the host information is passed as `user@server.com[:port][/path/to/run/dir]`. The default run directory is `<login_dir>/abaverify_temp/`. Requires the python package `paramiko`. Looks for a file in the `tests/` directory called `abaverify_remote_options.py`, which can be used to set options for working with the remote server. An example of this file is available `abaverify/tests/tests/abaverify_remote_options.p`. Usage example:
+- `-R` or `--remoteHost` can be specified to run the tests on a remote host, where the host information is passed as `user@server.com[:port][/path/to/run/dir]`. The default run directory is `<login_dir>/abaverify_temp/`. Looks for a file in the `tests/` directory called `abaverify_remote_options.py`, which can be used to set options for working with the remote server. An example of this file is available `abaverify/tests/tests/abaverify_remote_options.p`. Usage example:
 ```
 tests $  python test_runner.py -R username@server.sample.com
 ```
-- `-s` or equivalently `--specifyPathToSub` can be used to override the relative path to the user subroutine specified in the the call `av.runTests()` in your `test_runner.py` file.
+- `-s` or equivalently `--specifyPathToSub` can be used to override the relative path to the user subroutine specified in the the call `abaverify.runTests()` in your `test_runner.py` file.
 - `-t` or `--time` can be specified to print the run times for the compiler, packager, and solver to the terminal. For example:
 ```
 tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 --timer
