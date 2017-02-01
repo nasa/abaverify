@@ -699,6 +699,7 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 			if not options.useExistingBinaries:
 				wd = os.getcwd()
 				if options.precompileCode:
+					raise Exception("The -c option is not currently implemented.")
 					try:
 						compileCodeFunc()
 					except:
