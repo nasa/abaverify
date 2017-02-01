@@ -108,6 +108,8 @@ The file `sample_usage.py` gives an example of how you call your newly created t
 2. classes that inherit `abaverify.TestCase` and define functions beginning with `test` following the usage of `unittest`. See the `sample_usage.py` for an example.
 3. call to `runTests()` which takes one argument: the relative path to your user subroutine (omit the `.f` or `.for` ending, the code automatically appends it).
 
+Functionality in `unittest` can be accessed via `abaverify.unittest`. One example of the use case for this is that `unittest` decorators can be applied to functions and classes in the `test_runner.py` file.
+
 ### Running your tests
 Before running tests, make sure you place an Abaqus environment file in your project's `tests/` directory. At a minimum, the environment file should include the options for compiling your subroutine. If you do not include your environment file, `abaverify` will give an error.
 
