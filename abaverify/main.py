@@ -104,11 +104,17 @@ class TestCase(unittest.TestCase):
 				self.callAbaqusOnRemote(cmd=options.abaqusCmd + ' cae noGUI=processresults.py -- -- ' + jobName, log=f, timer=timer)
 				try:
 					ftp = options.ssh.open_sftp()
-					ftp.chdir(options.remote_run_dir)
-					ftp.get(jobName + '_results.py', 'testOutput/' + jobName + '_results.py')
+					ftp.chdir(options.remote_run_directory)
+					try:
+						ftp.get(jobName + '_results.py', 'testOutput/' + jobName + '_results.py')
+					except:
+						pass
 					if options.remote['copy_results_to_local']:
 						for ext in ['.dat', '.msg', '.odb', '.sta']:
-							ftp.get(jobName + ext, 'testOutput/' + jobName + ext)
+							try:
+								ftp.get(jobName + ext, 'testOutput/' + jobName + ext)
+							except:
+								pass
 				finally:
 					ftp.close()
 
@@ -143,7 +149,7 @@ class TestCase(unittest.TestCase):
 		else:
 			try:
 				ftp = options.ssh.open_sftp()
-				ftp.chdir(options.remote_run_dir)
+				ftp.chdir(options.remote_run_directory)
 				ftp.put(jobName + '.inp', jobName + '.inp')
 				ftp.put(jobName + '_expected.py', jobName + '_expected.py')
 			finally:
@@ -229,7 +235,7 @@ class TestCase(unittest.TestCase):
 		Logic for calls to abaqus on a remote server. Support streaming the output to the log file.
 		"""
 
-		stdin, stdout, stderr = options.ssh.exec_command('cd ' + options.remote_run_dir + '; ' + cmd)
+		stdin, stdout, stderr = options.ssh.exec_command('cd ' + options.remote_run_directory + '; ' + cmd)
 		stdin.close()
 		for line in iter(lambda: stdout.readline(2048), ""):
 
@@ -360,11 +366,17 @@ class ParametricMetaClass(type):
 							self.callAbaqusOnRemote(cmd=options.abaqusCmd + ' cae noGUI=processresults.py -- -- ' + jobName, log=f, timer=timer)
 							try:
 								ftp = options.ssh.open_sftp()
-								ftp.chdir(options.remote_run_dir)
-								ftp.get(jobName + '_results.py', 'testOutput/' + jobName + '_results.py')
+								ftp.chdir(options.remote_run_directory)
+								try:
+									ftp.get(jobName + '_results.py', 'testOutput/' + jobName + '_results.py')
+								except:
+									pass
 								if options.remote['copy_results_to_local']:
 									for ext in ['.dat', '.msg', '.odb', '.sta']:
-										ftp.get(jobName + ext, 'testOutput/' + jobName + ext)
+										try:
+											ftp.get(jobName + ext, 'testOutput/' + jobName + ext)
+										except:
+											pass
 							finally:
 								ftp.close()
 
@@ -534,14 +546,22 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 			import abaverify_remote_options as aro
 			user_defined_attributes = [attr for attr in dir(aro) if '__' not in attr]
 			remote_opts = {attr: getattr(aro, attr) for attr in user_defined_attributes}
-			setattr(options, 'remote', remote_opts)
 		except:
-			# Set defaults
+			# Create dictionary to populate
 			remote_opts = dict()
+
+		# Set deaults
+		if 'remote_run_directory' not in remote_opts:
+			remote_opts['remote_run_directory'] = 'abaverify_temp'
+		if 'local_files_to_copy_to_remote' not in remote_opts:
 			remote_opts['local_files_to_copy_to_remote'] = []
+		if 'source_file_regexp' not in remote_opts:
+			remote_opts['source_file_regexp'] = r'.*\.for$'
+		if 'copy_results_to_local' not in remote_opts:
 			remote_opts['copy_results_to_local'] = False
+		if 'environment_file_name' not in remote_opts:
 			remote_opts['environment_file_name'] = 'abaqus_v6_remote.env'
-			setattr(options, 'remote', remote_opts)
+		
 
 		# Check for optional path to a run directory
 		match = re.search(r'^([A-Za-z0-9\-\.]+)@([A-Za-z0-9\-\.]+):?([0-9]+)?(.*)$', options.host)
@@ -553,11 +573,14 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 		else:
 			raise ValueError("Unable to understand the specified host " + options.host + "; please use proper formatting.")
 		# Set default run directory
-		if not runDir:
-			runDir = 'abaverify_temp'
+		if runDir:
+			remote_opts['remote_run_directory'] = runDir
+		else:
+			runDir = remote_opts['remote_run_directory']
 		if not port:
 			port = 22
-		setattr(options, 'remote_run_dir', runDir)
+		setattr(options, 'remote', remote_opts)
+		setattr(options, 'remote_run_directory', remote_opts['remote_run_directory'])
 
 		# Gather required information
 		pw = getpass.getpass('Enter the password for ' + userName + "@" + fqdn + ': ')
