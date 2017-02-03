@@ -15,6 +15,7 @@ import time
 import inspect
 import getpass
 import datetime
+import pprint
 
 #
 # Local
@@ -80,6 +81,8 @@ class TestCase(unittest.TestCase):
 		Generic test method
 		"""
 
+		if options.verbose or options.interactive: print ""
+
 		# Save output to a log file
 		with open(os.path.join(os.getcwd(), 'testOutput', jobName + '.log'), 'w') as f:
 
@@ -142,6 +145,7 @@ class TestCase(unittest.TestCase):
 				userSubPath = os.path.join(os.getcwd(), options.relPathToUserSub + subext)
 			else:
 				userSubPath = os.path.basename(options.relPathToUserSub) + subext
+			if options.verbose: print "Using subroutine: " + userSubPath
 
 		# Copy input deck
 		if options.host == "localhost":
@@ -151,7 +155,9 @@ class TestCase(unittest.TestCase):
 				ftp = options.ssh.open_sftp()
 				ftp.chdir(options.remote_run_directory)
 				ftp.put(jobName + '.inp', jobName + '.inp')
+				if options.verbose: print "Copying: " + jobName + '.inp'
 				ftp.put(jobName + '_expected.py', jobName + '_expected.py')
+				if options.verbose: print "Copying: " + jobName + '_expected.py'
 			finally:
 				ftp.close()
 
@@ -162,6 +168,7 @@ class TestCase(unittest.TestCase):
 		if options.cpus > 1:
 			cmd += ' cpus=' + str(options.cpus)
 		cmd += ' double=both interactive'
+		if options.verbose: print "Abaqus command: " + cmd
 
 		# Copy parameters file, if it exists
 		if options.host == "localhost":
@@ -235,6 +242,7 @@ class TestCase(unittest.TestCase):
 		Logic for calls to abaqus on a remote server. Support streaming the output to the log file.
 		"""
 
+		if options.verbose: print "Calling abaqus on the remote host"
 		stdin, stdout, stderr = options.ssh.exec_command('cd ' + options.remote_run_directory + '; ' + cmd)
 		stdin.close()
 		for line in iter(lambda: stdout.readline(2048), ""):
@@ -301,6 +309,8 @@ class ParametricMetaClass(type):
 
 
 			def test(self):
+
+				if options.verbose or options.interactive: print ""
 
 				try:
 					# Create the input deck
@@ -456,6 +466,7 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 	parser.add_option("-k", "--keepExistingOutputFiles", action="store_true", dest="keepExistingOutputFile", default=False, help="Does not delete existing files in the /testOutput directory")
 	parser.add_option("-C", "--cpus", action="store", type="int", dest="cpus", default=1, help="Specify the number of cpus to run abaqus jobs with")
 	parser.add_option("-R", "--remoteHost", action="store", type="string", dest="host", default="localhost", help="Run on remote host; e.g. user@server.com[:port][/path/to/run/dir]. Default run dir is <login_dir>/abaverify_temp/")
+	parser.add_option("-V", "--verbose", action="store_true", dest="verbose", default=False, help="Print information for debugging")
 	(options, args) = parser.parse_args()
 
 	# Remove custom args so they do not get sent to unittest
@@ -477,7 +488,12 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 				del sys.argv[idx:idx+2]
 			else:
 				sys.argv.remove(x)
-	
+	if options.verbose:
+		pp = pprint.PrettyPrinter(indent=4)
+		print "Options:"
+		pp.pprint(options.__dict__)
+		print "Arguments passed to unittest:"
+		pp.pprint(sys.argv)
 
 	# Check version of script and notify the user if its out of date
 	path_to_latest_ver_file = os.path.join(ABAVERIFY_INSTALL_DIR, 'latest.txt')
@@ -487,6 +503,7 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 		try:
 			import json
 			import urllib2
+			print "Attempting to connect to github to check if updates are available for abaverify"
 			response = urllib2.urlopen('https://api.github.com/repos/nasa/abaverify/releases/latest')
 			data = json.load(response)
 			tag = data['tag_name']
@@ -496,7 +513,10 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 			# with open(os.path.join(ABAVERIFY_INSTALL_DIR, 'latest.txt'),'r') as f:
 			# 	output = f.read()
 		except:
-			pass
+			if options.verbose:
+				print "Error connecting to github to check version"
+			else:
+				pass
 
 		# Load current version
 		current_version = "v0.0.0"
@@ -509,7 +529,9 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 		# Compare versions
 		if versiontuple("0.3.0") > versiontuple(current_version):
 			print "  NOTICE: Version {0} of abaverify available, consider upgrading from your current version ({1})".format(latest_version, current_version)
-
+		else:
+			if options.verbose:
+				print "Checked for updates; none found."
 
 	# Remote host
 	#
@@ -540,6 +562,8 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 			ssh = paramiko.SSHClient()
 		except:
 			raise Exception("Failed to load paramiko. The -R option requires Paramiko. Please make sure that paramiko is installed and configured")
+
+		if options.verbose: print "Using remote host"
 
 		# Load remote options
 		try:
@@ -582,6 +606,15 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 		setattr(options, 'remote', remote_opts)
 		setattr(options, 'remote_run_directory', remote_opts['remote_run_directory'])
 
+		if options.verbose:
+			print "userName: " + userName
+			print "fqdn: " + fqdn
+			print "port: " + str(port)
+
+		if options.verbose:
+			print "remote_opts: "
+			pp.pprint(remote_opts)
+
 		# Gather required information
 		pw = getpass.getpass('Enter the password for ' + userName + "@" + fqdn + ': ')
 
@@ -600,6 +633,7 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 				ssh.close()
 				raise Exception("Unknown error on remote when searching for run directory.")
 		stdin, stdout, stderr = ssh.exec_command("rm -rf " + runDir + "/*")
+		if options.verbose: print "Run directory cleaned"
 
 		# Transfer files to the run directory
 		try:
@@ -610,29 +644,28 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 			source_file_dir = os.path.dirname(options.relPathToUserSub)
 			sourceFiles = [os.path.join(os.path.dirname(options.relPathToUserSub), f) for f in os.listdir(source_file_dir)]
 			for sourceFile in sourceFiles:
-				print "Copying: " + os.path.abspath(sourceFile)
+				if options.verbose: print "Copying: " + os.path.abspath(sourceFile)
 				ftp.put(sourceFile, os.path.basename(sourceFile))
 
 			# Make sure there's a symbolic link on the remote so that abaqus doesn't complain about .f and .for
 			subroutine_file_name = os.path.basename(options.relPathToUserSub)
-			if subroutine_file_name + '.f' not in os.listdir(source_file_dir):
-				ssh.exec_command('cd ' + options.remote_run_dir + '; ' + 'ln -s ' + subroutine_file_name + '.for ' + subroutine_file_name + '.f')
+			ssh.exec_command('cd ' + options.remote_run_directory + '; ' + 'ln -s ' + subroutine_file_name + '.for ' + subroutine_file_name + '.f')
 
 			# Environment file (expects naming convention: abaqus_v6_remote.env)
 			env_file_name = options.remote['environment_file_name']
 			if os.path.isfile(os.path.join(os.getcwd(), env_file_name)):
-				print "Copying: " + os.path.abspath(env_file_name)
+				if options.verbose: print "Copying: " + os.path.abspath(env_file_name)
 				ftp.put(env_file_name, 'abaqus_v6.env')
 
 			# abaverify_remote_options
 			if 'local_files_to_copy_to_remote' in options.remote:
 				for f in options.remote['local_files_to_copy_to_remote']:
-					print "Copying: " + os.path.abspath(f)
+					if options.verbose: print "Copying: " + os.path.abspath(f)
 					ftp.put(f, os.path.basename(f))
 
 			# abaverify processresults.py
 			pathForProcessResultsPy = os.path.join(ABAVERIFY_INSTALL_DIR, 'processresults.py')
-			print "Copying: " + pathForProcessResultsPy
+			if options.verbose: print "Copying: " + pathForProcessResultsPy
 			ftp.put(pathForProcessResultsPy, 'processresults.py')
 
 		finally:
