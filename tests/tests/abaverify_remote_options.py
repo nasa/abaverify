@@ -16,6 +16,11 @@
 # Copy results back to local directory? [Defualt is False]
 copy_results_to_local = True
 
+# Specify file extensions to indicate which files should be copied back to local working directory
+# This option is only relevant when copy_results_to_local = True
+# Default is ['.dat', '.inp', '.msg', '.odb', '.sta']
+#file_extensions_to_copy_to_local = ['.dat', '.inp', '.msg', '.odb', '.sta']
+
 
 # Name of environment file to use on remote [Default is 'abaqus_v6_remote.env']
 # The file is automatically renamed abaqus_v6.env on the remote

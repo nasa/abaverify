@@ -113,7 +113,7 @@ class TestCase(unittest.TestCase):
 					except:
 						pass
 					if options.remote['copy_results_to_local']:
-						for ext in ['.dat', '.msg', '.odb', '.sta']:
+						for ext in options.remote['file_extensions_to_copy_to_local']:
 							try:
 								ftp.get(jobName + ext, 'testOutput/' + jobName + ext)
 							except:
@@ -382,7 +382,7 @@ class ParametricMetaClass(type):
 								except:
 									pass
 								if options.remote['copy_results_to_local']:
-									for ext in ['.dat', '.msg', '.odb', '.sta']:
+									for ext in options.remote['file_extensions_to_copy_to_local']:
 										try:
 											ftp.get(jobName + ext, 'testOutput/' + jobName + ext)
 										except:
@@ -583,6 +583,8 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 			remote_opts['source_file_regexp'] = r'.*\.for$'
 		if 'copy_results_to_local' not in remote_opts:
 			remote_opts['copy_results_to_local'] = False
+		if 'file_extensions_to_copy_to_local' not in remote_opts:
+			remote_opts['file_extensions_to_copy_to_local'] = ['.dat', '.inp', '.msg', '.odb', '.sta']
 		if 'environment_file_name' not in remote_opts:
 			remote_opts['environment_file_name'] = 'abaqus_v6_remote.env'
 		
