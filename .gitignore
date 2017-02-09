@@ -41,3 +41,6 @@
 
 # testOutput
 /tests/tests/testOutput/
+
+# Default archive folder
+/tests/tests/autoTestArchive
