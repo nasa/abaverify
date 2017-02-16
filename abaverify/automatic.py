@@ -7,6 +7,8 @@ import json
 import time
 import zipfile
 import shutil
+import inspect
+import socket
 
 import smtplib
 import email.utils
@@ -180,14 +182,28 @@ class Automatic():
 
 
 	def generateReport(self, template):
-		rpt = _generateReport(template=template, report=self.test_report)
-		self.formatted_reports[template] = rpt
-		return rpt
+		sha = self.test_report.metaData['sha']
+		
+		# Build the report
+		ptat = self.archive_directory + os.path.sep + self.repository_name + '_' + sha + '_' + time.strftime("%Y-%b-%d")
+		rpt_str = _generateReport(template=template, report=self.test_report, path_to_archived_tests=ptat)
+		
+		# Name for report file
+		saveAs = os.path.join(self.archive_directory, template + '+' + sha + '_' + time.strftime("%Y-%b-%d") + '.html')
+		
+		# Write report to file
+		with open(saveAs, 'w') as outfile:
+			outfile.write(rpt_str)
+		self.formatted_reports[template] = saveAs
+		return rpt_str
 	
 
 	@classmethod
-	def generateReport2(cls, template, report):
-		return _generateReport(template=template, report=report)
+	def generateReport2(cls, template, report, saveAs):
+		rpt_str = _generateReport(template=template, report=report)
+		with open(saveAs, 'w') as outfile:
+			outfile.write(rpt_str)
+		return rpt_str
 
 
 	def generateRunTimePlots(self, template, path):
@@ -209,14 +225,22 @@ class Automatic():
 
 		# If the report has already been run, use it
 		if template in self.formatted_reports:
-			b = self.formatted_reports[template]
+			body_path = self.formatted_reports[template]
 		
 		# Otherwise run the report
 		else:
-			b = _generateReport(template=template, report=self.test_report)
+			self.generateReport(template=template)
+			body_path = self.formatted_reports[template]
+			
+		if self.verbose:
+			_logVerbose("Path to html file for email body: " + body_path)
+			_logVerbose("Sending email to " + str(recipients))
 
+		# Package repository info to pass to _emailResults
+		repo_info = {'name': self.repository_name, 'branch': self.repository_branch}
+		
 		# Call helper to send the email
-		_emailResults(recipients=recipients, sender=sender, body=b, attachments=None, repository_info=None)
+		_emailResults(recipients=recipients, sender=sender, body=body_path, attachments=None, repository_info=repo_info)
 		return
 
 
@@ -268,7 +292,9 @@ class Automatic():
 				self.test_report.addTestResult(s2[0])
 
 			else:
-				if self.verbose: _logParsing("NOT MATCHED", line)
+				if self.verbose: _logParsing("MATCHED", line)
+				s2 = line.split(' (')
+				self.test_report.addTestResult(s2[0])
 
 		# Match time:
 		elif re.match(r'.*time:.*$', line):
@@ -277,14 +303,19 @@ class Automatic():
 			self.test_report.setRunTime(category=match.group(1).lower(), duration=match.group(2))
 
 		# Match summary
-		elif re.match(r'Ran ([0-9]*) tests in ([0-9\.]*)s$', line):
-			match = re.search(r'Ran ([0-9]*) tests in ([0-9\.]*)s$', line)
+		elif re.match(r'Ran ([0-9]*) test[s]* in ([0-9\.]*)s$', line):
+			match = re.search(r'Ran ([0-9]*) test[s]* in ([0-9\.]*)s$', line)
 			self.test_report.setSummaryPassed(int(match.group(1)), match.group(2))
 		
 		# Failed summary
 		elif re.match(r'FAILED', line):
-			match = re.search(r'FAILED \(errors=([0-9]*)\)$', line)
-			self.test_report.setSummaryFailed(int(match.group(1)))
+			match = re.search(r'FAILED \([a-z]*=([0-9]*)[, =a-z1-9]*\)$', line)
+			if match:
+				if self.verbose: _logParsing("MATCHED", line)
+				self.test_report.setSummaryFailed(int(match.group(1)))
+			else:
+				if self.verbose: _logParsing("NOT MATCHED", line)
+				self.test_report.setSummaryFailed(-1)
 
 		# Other lines
 		else:
@@ -332,13 +363,14 @@ def _currentCommitTested(archive_directory):
 		return False
 
 
-def _generateReport(template, report):
+def _generateReport(template, report, path_to_archived_tests=""):
 	"""
 	Return the template with the test report data substituted 
 	"""
 
 	# TODO add some logic to check if template is in working directory, if not search templates dir
-	sys.path.append(os.path.join(os.pardir, os.pardir, 'templates'))
+	pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+	sys.path.append(os.path.join(pathForThisFile, os.pardir, 'templates'))
 
 	# Load the template file
 	templ = __import__(template)
@@ -351,8 +383,10 @@ def _generateReport(template, report):
 			solver_time=tr.run_times['solver'], status_color=c, status_text=tr.test_status)
 
 	# Build string for body
-	body_formatted_str = templ.body.format(git_sha=report.metaData['sha'], test_results=test_result_formatted_str, 
-		number_of_tests_run=report.summary['number_tests'], total_duration=report.summary['duration'])
+	ntestspass = report.summary['number_tests'] - report.summary['number_failed']
+	body_formatted_str = templ.body.format(fqdn=socket.getfqdn(), path_to_archived_tests=path_to_archived_tests, git_sha=report.metaData['sha'], test_results=test_result_formatted_str, 
+		number_of_tests_run=report.summary['number_tests'], total_duration=report.summary['duration'], num_tests_passed=ntestspass, 
+		num_tests_failed = report.summary['number_failed'])
 
 	return body_formatted_str
 
@@ -365,6 +399,9 @@ def _emailResults(recipients, sender, body, attachments, repository_info):
 	attachments = paths to files to attach to the email
 	repository_info = {'name': , 'branch': }
 	"""
+	
+	if type(recipients) is str:
+		recipients = [recipients, ]
 
 	msg = MIMEMultipart('alternative')
 
@@ -487,6 +524,8 @@ class TestReport():
 		self.metaData = dict()
 		self.test_results = list()
 		self.summary = dict()
+		self.summary['number_tests'] = 0
+		self.summary['number_failed'] = 0
 
 
 	@classmethod

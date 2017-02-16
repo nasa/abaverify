@@ -9,10 +9,8 @@ import abaverify as av
 
 def reportGenerator(archiveTestResultsJSONFile, templateName):
 	report = av.TestReport.fromArchivedResult(archiveTestResultsJSONFile)
-	html_summary = av.Automatic.generateReport2(template=templateName, report=report)
 	fp = os.path.join('testOutput', 'report_generator_test.html')
-	with open(fp, 'w') as outfile:
-		outfile.write(html_summary)
+	av.Automatic.generateReport2(template=templateName, report=report, saveAs=fp)
 	return fp
 
 def email(archiveTestResultsJSONFile, templateName, recipient):
