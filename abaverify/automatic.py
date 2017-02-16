@@ -137,7 +137,7 @@ class Automatic():
 				_logVerbose("Found uncommitted changes")
 
 		# Check if the current commit has been tested (and directory there are no uncommitted changes)
-		if not self.force_tests and _currentCommitTested():
+		if not self.force_tests and _currentCommitTested(self.archive_directory):
 			print "No new commits"
 			return False
 		
@@ -296,7 +296,7 @@ class Automatic():
 # Helper functions
 #
 
-def _currentCommitTested():
+def _currentCommitTested(archive_directory):
 	"""
 	Checks if the current SHA has an archived result
 	"""
@@ -306,7 +306,7 @@ def _currentCommitTested():
 	
 	# Get most recent SHA in archive dir
 	mostRecentTestResultsSHA = ''
-	files = [os.path.join(self.archive_directory, f) for f in os.listdir(self.archive_directory)]
+	files = [os.path.join(archive_directory, f) for f in os.listdir(archive_directory)]
 	if len(files) > 0:
 		files.sort(key=lambda x: os.path.getmtime(x))
 		pathToMostRecent = files.pop()
