@@ -644,7 +644,8 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 
 			# Fortran source files
 			source_file_dir = os.path.dirname(options.relPathToUserSub)
-			sourceFiles = [os.path.join(os.path.dirname(options.relPathToUserSub), f) for f in os.listdir(source_file_dir)]
+			pattern = re.compile(remote_opts['source_file_regexp'])
+			sourceFiles = [os.path.join(os.path.dirname(options.relPathToUserSub), f) for f in os.listdir(source_file_dir) if pattern.match(f)]
 			for sourceFile in sourceFiles:
 				if options.verbose: print "Copying: " + os.path.abspath(sourceFile)
 				ftp.put(sourceFile, os.path.basename(sourceFile))
@@ -685,7 +686,7 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 
 		# Remove rpy files
 		testPath = os.getcwd()
-		pattern = re.compile('^abaqus\.rpy(\.)*([0-9])*$')
+		pattern = re.compile(r'^abaqus\.rpy(\.)*([0-9])*$')
 		for f in os.listdir(testPath):
 			if pattern.match(f):
 				os.remove(os.path.join(os.getcwd(), f))
