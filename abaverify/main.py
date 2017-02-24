@@ -54,8 +54,123 @@ class measureRunTimes:
 			self.solver_time = self.solver_end - self.solver_start
 			sys.stderr.write("Solver run time: {:.2f} s\n".format(self.solver_time))
 
+
 def versiontuple(v):
-    return tuple(map(int, (v.split("."))))
+	return tuple(map(int, (v.split("."))))
+
+
+def _callAbaqus(cmd, log, timer=None, shell=True):
+	"""
+	Logic for calls to abaqus. Support streaming the output to the log file.
+	"""
+
+	p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, shell=shell)
+
+	# Parse output lines & save to a log file
+	for line in _outputStreamer(p):
+
+		# Time tests
+		if options.time:
+			if timer != None:
+				timer.processLine(line)
+
+		# Log data
+		log.write(line + "\n")
+		if options.interactive:
+			print line
+
+
+def _callAbaqusOnRemote(cmd, log, timer=None):
+	"""
+	Logic for calls to abaqus on a remote server. Support streaming the output to the log file.
+	"""
+
+	if options.verbose: print "Calling abaqus on the remote host"
+	stdin, stdout, stderr = options.ssh.exec_command('cd ' + options.remote_run_directory + '; ' + cmd)
+	stdin.close()
+	for line in iter(lambda: stdout.readline(2048), ""):
+
+		# Time tests
+		if options.time:
+			if timer != None:
+				timer.processLine(line)
+
+		# Log data
+		log.write(line)
+		if options.interactive:
+			print line
+			sys.stdout.flush()
+
+
+def _outputStreamer(proc, stream='stdout'):
+	"""
+	Hanldes streaming of subprocess.
+	Copied from: http://blog.thelinuxkid.com/2013/06/get-python-subprocess-output-without.html
+	"""
+
+	newlines = ['\n', '\r\n', '\r']
+	stream = getattr(proc, stream)
+	with contextlib.closing(stream):
+		while True:
+			out = []
+			last = stream.read(1)
+			# Don't loop forever
+			if last == '' and proc.poll() is not None:
+				break
+			while last not in newlines:
+				# Don't loop forever
+				if last == '' and proc.poll() is not None:
+					break
+				out.append(last)
+				last = stream.read(1)
+			out = ''.join(out)
+			yield out
+
+
+def _compileCode(libName):
+	"""
+	Default procedure to pre-compile a subroutine using abaqus make
+	"""
+
+	# Put a copy of the environment file in the /for directory
+	shutil.copyfile(os.path.join(os.getcwd(), 'abaqus_v6.env'), os.path.join(os.getcwd(), os.pardir, 'for', 'abaqus_v6.env'))
+
+	# Change directory to /for
+	os.chdir(os.path.join(os.pardir, 'for'))
+
+	# Run abaqus make
+	if (platform.system() == 'Linux'):
+		shell = False
+	else:
+		shell = True
+	try:
+		f = open(os.path.join(os.getcwd(), os.pardir, 'tests', 'testOutput', 'compile.log'), 'a')
+		_callAbaqus(cmd=['abaqus', 'make', 'library='+libName], log=f, shell=shell)
+	finally:
+		f.close()
+
+	# Remove env file from /for
+	os.remove(os.path.join(os.getcwd(), 'abaqus_v6.env'))
+
+	# Make sure build directory exists
+	if not os.path.isdir(os.path.join(os.pardir, 'build')):
+		os.makedirs(os.path.join(os.pardir, 'build'))
+
+	# Copy binaries into /build
+	numBinariesFound = 0
+	pattern  = re.compile('.*(\.dll|\.obj|\.so|\.o)$')
+	for f in os.listdir(os.getcwd()):
+		if pattern.match(f):
+			numBinariesFound += 1
+			shutil.copyfile(os.path.join(os.getcwd(), f), os.path.join(os.pardir, 'build', f))
+			os.remove(os.path.join(os.getcwd(), f))
+
+	if numBinariesFound < 4:
+		raise Exception("ERROR: Abaqus make failed")
+
+	# Change directory to /tests/
+	os.chdir(os.path.join(os.pardir, 'tests'))
+
 
 
 #
@@ -101,7 +216,7 @@ class TestCase(unittest.TestCase):
 				if not os.path.isfile(os.path.join(os.getcwd(), 'testOutput', jobName + '.odb')):
 					raise Exception("Error: Abaqus odb was not generated. Check the log file in the testOutput directory.")
 				pathForProcessResultsPy = '"' + os.path.join(ABAVERIFY_INSTALL_DIR, 'processresults.py') + '"'
-				self.callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName, log=f, timer=timer)
+				_callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName, log=f, timer=timer)
 
 			else: # Remote host
 				self.callAbaqusOnRemote(cmd=options.abaqusCmd + ' cae noGUI=processresults.py -- -- ' + jobName, log=f, timer=timer)
@@ -180,7 +295,7 @@ class TestCase(unittest.TestCase):
 		# Run the test from the testOutput directory
 		if options.host == "localhost":
 			os.chdir(os.path.join(os.getcwd(), 'testOutput'))
-			self.callAbaqus(cmd=cmd, log=f, timer=timer)
+			_callAbaqus(cmd=cmd, log=f, timer=timer)
 			os.chdir(os.pardir)
 		else:
 			self.callAbaqusOnRemote(cmd=cmd, log=f, timer=timer)
@@ -214,74 +329,6 @@ class TestCase(unittest.TestCase):
 						pass
 		else:
 			self.fail('No results file provided by process_results.py')
-
-
-	def callAbaqus(self, cmd, log, timer=None, shell=True):
-		"""
-		Logic for calls to abaqus. Support streaming the output to the log file.
-		"""
-
-		p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, shell=shell)
-
-		# Parse output lines & save to a log file
-		for line in self.outputStreamer(p):
-
-			# Time tests
-			if options.time:
-				if timer != None:
-					timer.processLine(line)
-
-			# Log data
-			log.write(line + "\n")
-			if options.interactive:
-				print line
-
-
-	def callAbaqusOnRemote(self, cmd, log, timer=None):
-		"""
-		Logic for calls to abaqus on a remote server. Support streaming the output to the log file.
-		"""
-
-		if options.verbose: print "Calling abaqus on the remote host"
-		stdin, stdout, stderr = options.ssh.exec_command('cd ' + options.remote_run_directory + '; ' + cmd)
-		stdin.close()
-		for line in iter(lambda: stdout.readline(2048), ""):
-
-			# Time tests
-			if options.time:
-				if timer != None:
-					timer.processLine(line)
-
-			# Log data
-			log.write(line)
-			if options.interactive:
-				print line
-				sys.stdout.flush()
-
-
-	def outputStreamer(self, proc, stream='stdout'):
-		"""
-		Hanldes streaming of subprocess.
-		Copied from: http://blog.thelinuxkid.com/2013/06/get-python-subprocess-output-without.html
-		"""
-
-		newlines = ['\n', '\r\n', '\r']
-		stream = getattr(proc, stream)
-		with contextlib.closing(stream):
-			while True:
-				out = []
-				last = stream.read(1)
-				# Don't loop forever
-				if last == '' and proc.poll() is not None:
-					break
-				while last not in newlines:
-					# Don't loop forever
-					if last == '' and proc.poll() is not None:
-						break
-					out.append(last)
-					last = stream.read(1)
-				out = ''.join(out)
-				yield out
 
 
 class ParametricMetaClass(type):
@@ -353,7 +400,7 @@ class ParametricMetaClass(type):
 
 						# Generate input file from python script
 						if 'pythonScriptForModel' in testCase:
-							self.callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + inpFilePath, log=f)
+							_callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + inpFilePath, log=f)
 
 						# Time tests
 						if options.time:
@@ -370,7 +417,7 @@ class ParametricMetaClass(type):
 							if not os.path.isfile(os.path.join(os.getcwd(), 'testOutput', jobName + '.odb')):
 								raise Exception("Error: Abaqus odb was not generated. Check the log file in the testOutput directory.")
 							pathForProcessResultsPy = '"' + os.path.join(ABAVERIFY_INSTALL_DIR, 'processresults.py') + '"'
-							self.callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName, log=f, timer=timer)
+							_callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName, log=f, timer=timer)
 
 						else: # Remote host
 							self.callAbaqusOnRemote(cmd=options.abaqusCmd + ' cae noGUI=processresults.py -- -- ' + jobName, log=f, timer=timer)
@@ -511,7 +558,7 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 			with open(path_to_latest_ver_file, "w") as h:
 				h.write(latest_version)
 			# with open(os.path.join(ABAVERIFY_INSTALL_DIR, 'latest.txt'),'r') as f:
-			# 	output = f.read()
+			#   output = f.read()
 		except:
 			if options.verbose:
 				print "Error connecting to github to check version"
@@ -758,9 +805,12 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 			if not options.useExistingBinaries:
 				wd = os.getcwd()
 				if options.precompileCode:
-					raise Exception("The -c option is not currently implemented.")
 					try:
-						compileCodeFunc()
+						# If an external function is provided use it; otherwise use builtin capability
+						if compileCodeFunc:
+							compileCodeFunc()
+						else:
+							_compileCode(os.path.basename(options.relPathToUserSub))
 					except:
 						print "ERROR: abaqus make failed.", sys.exc_info()[0]
 						raise Exception("Error compiling with abaqus make. Look for 'compile.log' in the testOutput directory. Or try running 'abaqus make library=CompDam_DGD' from the /for directory to debug.")

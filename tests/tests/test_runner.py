@@ -28,8 +28,6 @@ class SingleElementTests(av.TestCase):
 	def test_CPS4R_shear(self):
 		self.runTest('test_CPS4R_shear') # TODO
 
-	def test_CPS4R_compression2(self):
-		self.runTest('will_fail')
 
 # That's it for setup. Add as many tests as you want!
 
