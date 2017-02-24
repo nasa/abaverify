@@ -139,7 +139,7 @@ class Automatic():
 				_logVerbose("Found uncommitted changes")
 
 		# Check if the current commit has been tested (and directory there are no uncommitted changes)
-		if not self.force_tests and _currentCommitTested(self.archive_directory):
+		if not self.force_tests and _currentCommitTested(self.archive_directory, self.verbose):
 			print "No new commits"
 			return False
 		
@@ -327,34 +327,34 @@ class Automatic():
 # Helper functions
 #
 
-def _currentCommitTested(archive_directory):
+def _currentCommitTested(archive_directory, verbose=False):
 	"""
 	Checks if the current SHA has an archived result
 	"""
 
 	# Get current SHA
 	currentSHA = subprocess.check_output("git rev-parse --short HEAD", shell=True).strip()
-	
+	if verbose:
+		_logVerbose("Current SHA: {0}".format(currentSHA))
+
 	# Get most recent SHA in archive dir
 	mostRecentTestResultsSHA = ''
 	files = [os.path.join(archive_directory, f) for f in os.listdir(archive_directory)]
 	if len(files) > 0:
 		files.sort(key=lambda x: os.path.getmtime(x))
 		pathToMostRecent = files.pop()
-
-		# # Filter for files that match the naming convention
-		# pattern = re.compile('.*DGD_.*\.html$')
-		# filteredFiles = [fileName.split('/').pop() for fileName in files if pattern.match(fileName)]
-		# fileName = filteredFiles[-1]
 		
-		print "Most recent file " + pathToMostRecent
+		if verbose:
+			_logVerbose("Most recent results file name: {0}".format(pathToMostRecent))
 
-		match = re.search(r'.*_([a-zA-Z0-9]*)_.*\.json$', pathToMostRecent.split('/').pop())
+		match = re.search(r'.*([a-zA-Z0-9]{7})_.*\.(html|json|zip)$', pathToMostRecent.split('/').pop())
 		if match:
-			if len(match.groups()) != 1:
+			if len(match.groups()) != 2:
 				raise Exception("Error parsing file names in archive directory")
 			
 			mostRecentTestResultsSHA = match.groups()[0]
+			if verbose:
+				_logVerbose("Most recently tested SHA: {0}".format(mostRecentTestResultsSHA))
 	
 	# Compare SHAs
 	if (currentSHA == mostRecentTestResultsSHA):
