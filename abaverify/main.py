@@ -298,7 +298,7 @@ class TestCase(unittest.TestCase):
 			_callAbaqus(cmd=cmd, log=f, timer=timer)
 			os.chdir(os.pardir)
 		else:
-			self.callAbaqusOnRemote(cmd=cmd, log=f, timer=timer)
+			_callAbaqusOnRemote(cmd=cmd, log=f, timer=timer)
 
 
 	def runAssertionsOnResults(self, jobName):
@@ -420,7 +420,7 @@ class ParametricMetaClass(type):
 							_callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName, log=f, timer=timer)
 
 						else: # Remote host
-							self.callAbaqusOnRemote(cmd=options.abaqusCmd + ' cae noGUI=processresults.py -- -- ' + jobName, log=f, timer=timer)
+							_callAbaqusOnRemote(cmd=options.abaqusCmd + ' cae noGUI=processresults.py -- -- ' + jobName, log=f, timer=timer)
 							try:
 								ftp = options.ssh.open_sftp()
 								ftp.chdir(options.remote_run_directory)
