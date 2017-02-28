@@ -86,7 +86,7 @@ def _callAbaqusOnRemote(cmd, log, timer=None):
 	"""
 
 	if options.verbose: print "Calling abaqus on the remote host"
-	stdin, stdout, stderr = options.ssh.exec_command('cd ' + options.remote_run_directory + '; ' + cmd)
+	stdin, stdout, stderr = options.ssh.exec_command('cd ' + options.remote_run_directory + '; ' + cmd + ' >& /dev/stdout')
 	stdin.close()
 	for line in iter(lambda: stdout.readline(2048), ""):
 
