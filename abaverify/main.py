@@ -708,10 +708,13 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 			for sourceFile in sourceFiles:
 				if options.verbose: print "Copying: " + os.path.abspath(sourceFile)
 				ftp.put(sourceFile, os.path.basename(sourceFile))
+				if options.verbose: print "... file copied."
 
 			# Make sure there's a symbolic link on the remote so that abaqus doesn't complain about .f and .for
 			subroutine_file_name = os.path.basename(options.relPathToUserSub)
+			if options.verbose: print "Creating a symbolic link to the source file"
 			ssh.exec_command('cd ' + options.remote_run_directory + '; ' + 'ln -s ' + subroutine_file_name + '.for ' + subroutine_file_name + '.f')
+			if options.verbose: print "... symbolic link created."
 
 			# Environment file (expects naming convention: abaqus_v6_remote.env)
 			env_file_name = options.remote['environment_file_name']
