@@ -229,7 +229,7 @@ class TestCase(unittest.TestCase):
 
 			# Execute the solver
 			if not options.useExistingResults:
-				self._runModel(jobName=jobName, f=f, timer=timer)
+				self._runModel(jobName=jobName, logFileHandle=f, timer=timer)
 
 			# Execute process_results script load ODB and get results
 			if options.host == "localhost":
@@ -471,7 +471,7 @@ class ParametricMetaClass(type):
 
 						# Execute the solver
 						if not options.useExistingResults:
-							self._runModel(jobName=jobName, f=f, timer=timer)
+							self._runModel(jobName=jobName, logFileHandle=f, timer=timer)
 
 						# Execute process_results script load ODB and get results
 						if options.host == "localhost":
