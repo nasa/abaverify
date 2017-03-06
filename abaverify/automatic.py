@@ -9,6 +9,10 @@ import zipfile
 import shutil
 import inspect
 import socket
+import datetime as dt
+
+import plotly.offline as ply
+import plotly.graph_objs as plygo
 
 import smtplib
 import email.utils
@@ -206,17 +210,37 @@ class Automatic():
 		return rpt_str
 
 
-	def generateRunTimePlots(self, template, path):
+	def generateRunTimePlots(self, template):
 		"""
-		Build plots with plotly (see runtimeplots.py)
+		Build plots with plotly
 		"""
-		pass
+		plt_str = _generateRunTimePlots(template=template, path_to_archived_tests=self.archive_directory, verbose=self.verbose)
+		
+		# Name for report file
+		saveAs = os.path.join(self.archive_directory, template + '+' + self.test_report.metaData['sha'] + '_' + time.strftime("%Y-%b-%d") + '.html')
+		
+		# Write report to file
+		with open(saveAs, 'w') as outfile:
+			outfile.write(plt_str)
+		return plt_str
+
+
+	@classmethod
+	def generateRunTimePlots2(cls, template, path_to_archived_tests, saveAs, verbose=False):
+		"""
+		Build plots with plotly
+		"""
+		plt_str = _generateRunTimePlots(template=template, path_to_archived_tests=path_to_archived_tests, verbose=verbose)
+		with open(saveAs, 'w') as outfile:
+			outfile.write(plt_str)
+		return plt_str
 
 
 	def commitReportToGitHub(self, repo_info):
 		"""
 		Options should be set at instantiation
 		"""
+
 
 	def emailResults(self, recipients, sender, template):
 		"""
@@ -391,6 +415,153 @@ def _generateReport(template, report, path_to_archived_tests=""):
 	return body_formatted_str
 
 
+def _generateRunTimePlots(template, path_to_archived_tests, verbose=False):
+	"""
+	Populate the plot template with data from the path_to_archived_tests
+	Returns a string containing the html
+	"""
+
+	# TODO add some logic to check if template is in working directory, if not search templates dir
+	pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+	sys.path.append(os.path.join(pathForThisFile, os.pardir, 'templates'))
+
+	# Load the template file
+	templ = __import__(template)
+
+	# Read the json files into test_data
+	# tests[<test_name>] = [{'date': <date>, 'commit': <>, 'runTime': <testRunTime>, 'passed': <bool>}, ...]
+	test_data = dict()
+	jsonfiles = [f for f in os.listdir(path_to_archived_tests) if f.endswith('.json')]
+	# jsonfiles = glob.glob('path_to_archived_tests/*json')
+	jsonfiles.sort(key=lambda x: os.path.getmtime(os.path.join(path_to_archived_tests, x)))
+	for jsonfile in jsonfiles:
+		if verbose: _logVerbose("processing file " + jsonfile)
+
+		# Parse file name to get testDate
+		matches = re.match(r'.*_([0-9]{4}-[a-zA-Z]{3}-[0-9]+)\.json$', jsonfile)
+		if matches:
+			grps = matches.groups()
+			if len(grps) != 1:
+				raise Exception("Failed while attempting to parse file name")
+			# Get the date
+			test_date = dt.datetime.strptime(grps[0], '%Y-%b-%d').date()
+
+		# Load test report as a dictionary
+		test_report = TestReport.fromArchivedResult(os.path.join(path_to_archived_tests, jsonfile)).getDict()
+
+		# Loop through tests results and gather the run times
+		for test_result in test_report['test_results']:
+			# Add test result to collection of data
+			test_name = test_result['test_name']
+			if test_name not in test_data:
+				test_data[test_name] = list()
+			test_data[test_name].append({'date': test_date, 'commit': test_report['metaData']['sha'], 'runTime': test_result['run_times']['solver'], 'passed': test_result['test_status']})
+
+	# Storage for plotly data, key is figure title
+	plotly_data_dict = dict()
+
+	# Create an empty dict if the test_groups option is not used in the template
+	if not hasattr(templ, 'test_group_prefixes'):
+		templ.test_group_prefixes = []
+
+	# Loop through the collection of run times and build the data structures to plot
+	figNums = range(0,len(templ.test_group_prefixes))
+	for test_name in test_data.keys():
+
+		# Sort the data into the appropriate figure accounting for the test_group_prefixes
+		fig_title = ''
+		for test_group in templ.test_group_prefixes:
+			if test_group in test_name:
+				fig_title = test_group
+				if verbose: _logVerbose("Adding {} to figure number {}".format(str(test_name), str(fig_title)))
+				break
+		if not fig_title:
+			fig_title = test_name
+
+		# Collect the data
+		x = [item[templ.x_axis_qty] for item in test_data[test_name]]
+		y = [item['runTime'] for item in test_data[test_name]]
+
+		# Create a dictionary entry if it doesn't exist already 
+		if fig_title not in plotly_data_dict:
+			plotly_data_dict[fig_title] = list()
+
+		# Add the run time data to plotly_data_dict 
+		plotly_data_dict[fig_title].append(plygo.Scatter(x=x, y=y, mode="lines", name=test_name, text=test_name, hoverinfo="text+x+y"))
+
+	
+	# Initializations
+	include_plotlyjs = True      # Only need to include plotlyjs once
+	plot_html_str = ""           # Build html string to return
+	toc = ""
+
+	# Create an empty dict if the test_groups option is not used in the template
+	if not hasattr(templ, 'chart_groups'):
+		templ.chart_groups = {}
+
+	# Loop trhough chart_groups
+	# TODO sort keys
+	for chart_group_key in templ.chart_groups.keys():
+				
+		subsection_toc = ""
+		subsection_plots = ""
+
+		# Load each chart in the subsection
+		for chart_name in templ.chart_groups[chart_group_key]['charts']:
+
+			if chart_name not in plotly_data_dict.keys():
+				raise ValueError('The chart name {0} specified in the template file is not valid'.format(chart_name))
+
+			# Generate plot html
+			subsection_plots += _plotly_helper(template=templ, chart_name=chart_name, plotly_data_dict=plotly_data_dict, include_plotlyjs=include_plotlyjs)
+
+			# Only include plotly js once
+			if include_plotlyjs:
+				include_plotlyjs=False
+
+			subsection_toc += templ.toc.format(plot_title=chart_name)
+
+			# Remove chart from plotly_data_dict
+			del plotly_data_dict[chart_name]
+
+		# Subsection heading
+		plot_html_str += templ.subsection.format(section_name_dashes=chart_group_key, 
+			section_name=templ.chart_groups[chart_group_key]['name_pretty'], plots=subsection_plots)
+
+		# Add section to table of contents
+		toc += templ.subsection_toc_wrapper.format(subsection_title=chart_group_key, toc_entries=subsection_toc)
+	
+
+	# Loop through charts that are not in chart_groups
+	for chart_name in plotly_data_dict.keys():
+		# Generate plot html
+		plot_html_str += _plotly_helper(template=templ, chart_name=chart_name, plotly_data_dict=plotly_data_dict, include_plotlyjs=include_plotlyjs)
+
+		# Only include plotly js once
+		if include_plotlyjs:
+			include_plotlyjs=False
+
+		if hasattr(templ, 'toc'):
+			toc += templ.toc.format(plot_title=chart_name)
+
+	
+	# Final substitution
+	html_str = templ.body.format(plots=plot_html_str, toc=toc)
+
+	return html_str
+
+
+def _plotly_helper(template, chart_name, plotly_data_dict, include_plotlyjs):
+	# Formatting
+	layout = dict(title=chart_name, yaxis=dict(title = 'Solver run time [s]'), showlegend=False, 
+		height=template.plot_height, width=template.plot_width,)
+
+	# Create the figure
+	fig = dict(data=plotly_data_dict[chart_name], layout=layout)
+	plotlyhtml = ply.plot(fig, output_type='div', include_plotlyjs=include_plotlyjs)
+	return template.plot.format(plot=plotlyhtml, plot_title=chart_name)
+
+
 def _emailResults(recipients, sender, body, attachments, repository_info):
 	"""
 	Emails results
@@ -449,7 +620,6 @@ def _emailResults(recipients, sender, body, attachments, repository_info):
 		s.sendmail(sender, recipients, msg.as_string())         
 	finally:
 		s.quit()
-
 
 
 def _outputStreamer(proc, stream='stdout'):
