@@ -262,9 +262,20 @@ class Automatic():
 
 		# Package repository info to pass to _emailResults
 		repo_info = {'name': self.repository_name, 'branch': self.repository_branch}
+
+		# Handle attachments
+		# Load the template file
+		# TODO add some logic to check if template is in working directory, if not search templates dir
+		pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
+		sys.path.append(os.path.join(pathForThisFile, os.pardir, 'templates'))
+		templ = __import__(template)
+		if hasattr(templ, 'attachments'):
+			attachments = templ.attachments
+		else:
+			attachments = []
 		
 		# Call helper to send the email
-		_emailResults(recipients=recipients, sender=sender, body=body_path, attachments=None, repository_info=repo_info)
+		_emailResults(recipients=recipients, sender=sender, body=body_path, attachments=attachments, repository_info=repo_info)
 		return
 
 
@@ -567,7 +578,7 @@ def _emailResults(recipients, sender, body, attachments, repository_info):
 	Emails results
 	recipients = list
 	body = path to file containing body of email (assumes the file is html)
-	attachments = paths to files to attach to the email
+	attachments = ['path_to_file', ]
 	repository_info = {'name': , 'branch': }
 	"""
 	
@@ -586,33 +597,14 @@ def _emailResults(recipients, sender, body, attachments, repository_info):
 	msg["To"] = ", ".join(recipients)
 	msg["Subject"] = "[abaverify] Repository: " + repository_info['name'] + "; Branch: " + repository_info['branch']
 
-	# # TODO Attachments
-	# # Attach image files
-	# imgFileNames = [x for x in os.listdir(os.path.join(os.getcwd(), 'testOutput')) if x.endswith(".png")]
-	# for imgFileName in imgFileNames:
-	# 	imgPath = os.path.join(os.getcwd(), 'testOutput', imgFileName)
-	# 	with open(imgPath, 'rb') as i:
-	# 		img = MIMEBase('application', 'octect-stream')
-	# 		img.set_payload(i.read())
-	# 		Encoders.encode_base64(img)
-	# 		img.add_header('Content-Disposition', 'attachment; filename=%s' % os.path.basename(imgFileName))
-	# 		msg.attach(img)
-
-	# # Attach the html plot file
-	# with open(htmlFileName, 'rb') as h:
-	# 	htmlFileAttachment = MIMEBase('application', 'octect-stream')
-	# 	htmlFileAttachment.set_payload(h.read())
-	# 	Encoders.encode_base64(htmlFileAttachment)
-	# 	htmlFileAttachment.add_header('Content-Disposition', 'attachment; filename=%s' % htmlFileName)
-	# 	msg.attach(htmlFileAttachment)
-		
-	# # Attach the CompDam.parameters file
-	# with open(os.path.join('testOutput', 'CompDam.parameters'), 'rb') as h:
-	# 	paraFileAttachment = MIMEBase('application', 'octect-stream')
-	# 	paraFileAttachment.set_payload(h.read())
-	# 	Encoders.encode_base64(paraFileAttachment)
-	# 	paraFileAttachment.add_header('Content-Disposition', 'attachment; filename=CompDam.parameters')
-	# 	msg.attach(paraFileAttachment)
+	# Process attachments
+	for attachment in attachments:
+		with open(attachment['path'], 'rb') as h:
+			file_attachment = MIMEBase('application', 'octect-stream')
+			file_attachment.set_payload(h.read())
+			Encoders.encode_base64(file_attachment)
+			file_attachment.add_header('Content-Disposition', 'attachment; filename=%s' % os.path.basename(attachment['path']))
+			msg.attach(file_attachment)
 	
 	# Send
 	s = smtplib.SMTP('localhost')

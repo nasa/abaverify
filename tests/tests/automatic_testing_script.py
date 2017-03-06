@@ -31,8 +31,8 @@ result = av_auto.run()
 
 # Process the results
 if result:
-	# av_auto.emailResults(recipients="andrew.c.bergan@nasa.gov", sender="noreply@nasa.gov", 
-	# 	template='template_email_summary')
+	av_auto.emailResults(recipients="andrew.c.bergan@nasa.gov", sender="noreply@nasa.gov", 
+		template='template_email_summary')
 
 	av_auto.generateRunTimePlots(template='template_run_time_plots')
 

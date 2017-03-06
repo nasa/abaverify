@@ -33,3 +33,6 @@ Ran {number_of_tests_run} tests in {total_duration}s<br>
 <br>
 </body>
 """
+
+# import os
+# attachments = [os.path.abspath(x) for x in os.listdir(os.path.join(os.getcwd(), 'sample')) if x.endswith(".png")]

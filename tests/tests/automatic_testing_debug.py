@@ -13,8 +13,8 @@ def reportGenerator(archiveTestResultsJSONFile, templateName, outfile):
 	av.Automatic.generateReport2(template=templateName, report=report, saveAs=fp)
 	return fp
 
-def email(archiveTestResultsJSONFile, templateName, recipient):
-	fp = reportGenerator(archiveTestResultsJSONFile, templateName)
+def email(archiveTestResultsJSONFile, templateName, recipient, saveAs):
+	fp = reportGenerator(archiveTestResultsJSONFile, templateName, saveAs)
 	av.Automatic.emailResults2(recipients=[recipient, ], sender='noreply@nasa.gov', body=fp)
 	return
 
@@ -48,7 +48,7 @@ if __name__ == '__main__':
 		if len(options.email_recipients) < 1:
 			raise ValueError("Must specify recipeints via the -e option to use the email feature.")
 		email(archiveTestResultsJSONFile=options.report_json_file, templateName=template, 
-			recipient=options.email_recipients)
+			recipient=options.email_recipients, saveAs=options.output)
 
 	elif feature == 'runTimePlots':
 		if not options.output:
