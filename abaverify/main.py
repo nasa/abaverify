@@ -288,6 +288,10 @@ class TestCase(unittest.TestCase):
 			if options.host == "localhost":
 				if platform.system() == 'Linux':
 					subext = '.f'
+
+					# Make sure .f exists, if not create a symbolic link
+					if not os.path.isfile(os.path.join(os.getcwd(), options.relPathToUserSub + subext)):
+						os.symlink(os.path.join(os.getcwd(), options.relPathToUserSub + '.for'), os.path.join(os.getcwd(), options.relPathToUserSub + subext))
 				else:
 					subext = '.for'
 			else:

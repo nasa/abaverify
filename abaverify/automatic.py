@@ -280,7 +280,7 @@ class Automatic():
 
 
 	@classmethod
-	def emailResults2(cls, recipients, sender, body, attachments=None, repository_info=None):
+	def emailResults2(cls, recipients, sender, body, attachments=[], repository_info=None):
 		if repository_info is None:
 			repository_info = {'name': 'repo_name_placeholder', 'branch': 'repo_branch_placeholder'}
 
@@ -599,11 +599,11 @@ def _emailResults(recipients, sender, body, attachments, repository_info):
 
 	# Process attachments
 	for attachment in attachments:
-		with open(attachment['path'], 'rb') as h:
+		with open(attachment, 'rb') as h:
 			file_attachment = MIMEBase('application', 'octect-stream')
 			file_attachment.set_payload(h.read())
 			Encoders.encode_base64(file_attachment)
-			file_attachment.add_header('Content-Disposition', 'attachment; filename=%s' % os.path.basename(attachment['path']))
+			file_attachment.add_header('Content-Disposition', 'attachment; filename=%s' % os.path.basename(attachment))
 			msg.attach(file_attachment)
 	
 	# Send
