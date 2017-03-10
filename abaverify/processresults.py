@@ -505,7 +505,7 @@ for r in para["results"]:
 
     elif r["type"] == "log_stress_at_failure_init":
 
-        # Load history data for failure indices and store xy object to list 'failed' if the index is failed at last increment
+        # Load history data for failure indices and store xy object to list 'failed' if the index is failed
         failed = list()
         varNames = historyOutputNameFromIdentifier(identifier=r["failureIndices"], steps=steps)
         for i in range(0, len(varNames)):
@@ -513,8 +513,10 @@ for r in para["results"]:
             xy = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varNames[i], steps=steps)
             xy = session.xyDataObjects[n]
             odb.userData.XYData(n, xy)
-            if xy[-1][1] >= 1.0:
-                failed.append(xy)
+            for y in reversed(xy):
+                if y[1] >= 1.0:
+                    failed.append(xy)
+                    break
 
         # Make sure at least one failure index has reached 1.0
         if len(failed) <= 0:
@@ -523,7 +525,7 @@ for r in para["results"]:
         # Find the increment number where failure initiated
         i = len(failed[0])
         while True:
-            i = i - 1
+            i -= 1
             if len(failed) > 1:
                 for fi in failed:
                     if fi[i][1] < 1.0:
@@ -532,10 +534,8 @@ for r in para["results"]:
                     raise NotImplementedError("Multiple failure modes occurred at the same increment")
                 continue
             else:
-                if failed[0][i][1] >= 1.0:
-                    continue
-                elif failed[0][i][1] < 1.0:
-                    inc = i + 1
+                if failed[0][i][1] >= 1.0 and failed[0][i-1][1] < 1.0:
+                    inc = i
                     break
 
         # Get values of stress at final failure
@@ -628,7 +628,7 @@ for r in para["results"]:
 
         # Get the value calculated in the analysis (last frame must equal to 1, which is total step time)
         r["computedValue"] = xyDataObj[-1][1]
-        
+
         testResults.append(r)
 
     else:
