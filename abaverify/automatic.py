@@ -11,8 +11,13 @@ import inspect
 import socket
 import datetime as dt
 
-import plotly.offline as ply
-import plotly.graph_objs as plygo
+try:
+	import plotly.offline as ply
+	import plotly.graph_objs as plygo
+except:
+	print "WARNING import plotly failed"
+	print "try pip install plotly"
+	print "run time plots will fail if this warning appears"
 
 import smtplib
 import email.utils
@@ -115,6 +120,9 @@ class Automatic():
 
 		# Initialize a dict to store formated reports
 		self.formatted_reports = dict()
+
+		# Initialize attribute that stores the path to the run time plot file
+		self.run_time_plot_file_path = ""
 
 		# Print configuration if verbose is on
 		if self.verbose:
@@ -222,6 +230,10 @@ class Automatic():
 		# Write report to file
 		with open(saveAs, 'w') as outfile:
 			outfile.write(plt_str)
+
+		# Store a reference to the run time plots
+		self.run_time_plot_file_path = saveAs
+
 		return plt_str
 
 
@@ -273,6 +285,13 @@ class Automatic():
 			attachments = templ.attachments
 		else:
 			attachments = []
+
+		# Add run time plot file as attachment to email
+		if self.run_time_plot_file_path:
+			attachments.append(self.run_time_plot_file_path)
+
+		if self.verbose:
+			_logVerbose("Attachments: " + str(attachments))
 		
 		# Call helper to send the email
 		_emailResults(recipients=recipients, sender=sender, body=body_path, attachments=attachments, repository_info=repo_info)
@@ -540,7 +559,8 @@ def _generateRunTimePlots(template, path_to_archived_tests, verbose=False):
 			section_name=templ.chart_groups[chart_group_key]['name_pretty'], plots=subsection_plots)
 
 		# Add section to table of contents
-		toc += templ.subsection_toc_wrapper.format(subsection_title=chart_group_key, toc_entries=subsection_toc)
+		toc += templ.subsection_toc_wrapper.format(section_name_dashes=chart_group_key, 
+			section_name=templ.chart_groups[chart_group_key]['name_pretty'], toc_entries=subsection_toc)
 	
 
 	# Loop through charts that are not in chart_groups
