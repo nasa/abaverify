@@ -29,12 +29,16 @@ av_auto = av.Automatic(test_directory=os.getcwd(),
 # Run the tests
 result = av_auto.run()
 
+# PNG files in testOutpu
+attach = [os.path.join(os.getcwd(), 'testOutput', x) for x in os.listdir(os.path.join(os.getcwd(), 'testOutput')) if x.endswith(".dat")]
+
+
 # Process the results
 if result:
 	av_auto.generateRunTimePlots(template='template_run_time_plots')
 	
 	av_auto.emailResults(recipients="andrew.c.bergan@nasa.gov", sender="noreply@nasa.gov", 
-		template='template_email_summary')
+		template='template_email_summary', attachments=attach)
 
 	
 

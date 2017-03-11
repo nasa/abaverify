@@ -254,7 +254,7 @@ class Automatic():
 		"""
 
 
-	def emailResults(self, recipients, sender, template):
+	def emailResults(self, recipients, sender, template, attachments=[]):
 		"""
 		TODO: include options to attach plots etc from jobs (ie failure envelope plots)
 		"""
@@ -274,17 +274,6 @@ class Automatic():
 
 		# Package repository info to pass to _emailResults
 		repo_info = {'name': self.repository_name, 'branch': self.repository_branch}
-
-		# Handle attachments
-		# Load the template file
-		# TODO add some logic to check if template is in working directory, if not search templates dir
-		pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
-		sys.path.append(os.path.join(pathForThisFile, os.pardir, 'templates'))
-		templ = __import__(template)
-		if hasattr(templ, 'attachments'):
-			attachments = templ.attachments
-		else:
-			attachments = []
 
 		# Add run time plot file as attachment to email
 		if self.run_time_plot_file_path:
