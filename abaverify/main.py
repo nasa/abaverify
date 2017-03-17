@@ -613,8 +613,9 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
 			if x in [h._short_opts[0] for h in parser.option_list]:
 				idx = [h._short_opts[0] for h in parser.option_list].index(x)
 				option = parser.option_list[idx]
-			elif  x in [h._long_opts[0] for h in parser.option_list]:
-				raise ''
+			elif x in [h._long_opts[0] for h in parser.option_list]:
+				idx = [h._long_opts[0] for h in parser.option_list].index(x)
+				option = parser.option_list[idx]
 			
 			# If the option has additional info (e.g. -A abq6141), remove both from argv
 			if option.type in ["string", "int"]:
