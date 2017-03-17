@@ -180,23 +180,24 @@ class Automatic():
 		for line in _outputStreamer(p):
 			self._parseLine(line)
 
+		# Set file name 
+		self.base_file_name = self.repository_name + '_' + sha + '_' + time.strftime("%Y-%b-%d")
+		if self.test_report.metaData['uncommited_changes']: self.base_file_name = 'uc_' + self.base_file_name
+
 		# Archive the report
-		file_name = self.repository_name + '_' + sha + '_' + time.strftime("%Y-%b-%d") + '.json'
-		if self.test_report.metaData['uncommited_changes']: file_name = 'uc_' + file_name
-		trpath = os.path.join(self.archive_directory, file_name)
+		trpath = os.path.join(self.archive_directory, self.base_file_name + '.json')
 		with open(trpath, 'w') as outfile:
 			json.dump(self.test_report.getDict(), outfile)
 		if self.verbose:
 			_logVerbose("Archived test report at: " + trpath)
 
 		# zip job files and copy to the archive directory
-		file_name = os.path.splitext(file_name)[0]
-		zipf = zipfile.ZipFile(file_name + ".zip", 'w', allowZip64=True)
+		zipf = zipfile.ZipFile(self.base_file_name + ".zip", 'w', allowZip64=True)
 		_zipdir('testOutput', zipf)
 		zipf.close()
 
 		# Move the archive to storage
-		shutil.move(file_name + ".zip", os.path.join(self.archive_directory, file_name + ".zip"))
+		shutil.move(self.base_file_name + ".zip", os.path.join(self.archive_directory, self.base_file_name + ".zip"))
 
 		# Return the report obj
 		return True
@@ -206,11 +207,11 @@ class Automatic():
 		sha = self.test_report.metaData['sha']
 		
 		# Build the report
-		ptat = self.archive_directory + os.path.sep + self.repository_name + '_' + sha + '_' + time.strftime("%Y-%b-%d")
+		ptat = os.path.join(self.archive_directory, self.base_file_name)
 		rpt_str = _generateReport(template=template, report=self.test_report, path_to_archived_tests=ptat)
 		
 		# Name for report file
-		saveAs = os.path.join(self.archive_directory, template + '+' + sha + '_' + time.strftime("%Y-%b-%d") + '.html')
+		saveAs = os.path.join(self.archive_directory, self.base_file_name + '.html')
 		
 		# Write report to file
 		with open(saveAs, 'w') as outfile:
@@ -234,7 +235,7 @@ class Automatic():
 		plt_str = _generateRunTimePlots(template=template, path_to_archived_tests=self.archive_directory, verbose=self.verbose)
 		
 		# Name for report file
-		saveAs = os.path.join(self.archive_directory, template + '+' + self.test_report.metaData['sha'] + '_' + time.strftime("%Y-%b-%d") + '.html')
+		saveAs = os.path.join(self.archive_directory, self.base_file_name + '_' + template + '.html')
 		
 		# Write report to file
 		with open(saveAs, 'w') as outfile:
