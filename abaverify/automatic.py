@@ -45,7 +45,7 @@ class Automatic():
 	# Public API
 	#
 	def __init__(self, test_directory, archive_directory, repository=None, test_runner_file_name='test_runner.py',
-		time_tests=True, force_tests=False, verbose=False, tests_to_run=[]):
+		time_tests=True, force_tests=False, verbose=False, tests_to_run=[], abaqus_cmd='abaqus'):
 		"""
 		Setup Automatic with user defined options (kwargs)
 		"""
@@ -112,6 +112,9 @@ class Automatic():
 			raise ValueError("The argument tests_to_run for Automatic must be a list")
 		self.tests_to_run = tests_to_run
 
+		# Abaqus cmd (allows override to run a nondefault version of abaqus)
+		self.abaqus_cmd = abaqus_cmd
+
 		#-------------------------------------------------------------------------------
 		# Initialize a new test report
 
@@ -154,10 +157,16 @@ class Automatic():
 		if not self.force_tests and _currentCommitTested(self.archive_directory, self.verbose):
 			print "No new commits"
 			return False
-		
+
+		# Get abaqus version
+		abq_version_response = subprocess.check_output(self.abaqus_cmd + " information=release", shell=True)
+		self.abaqus_version = abq_version_response.split('\n')[1]
+		self.test_report.metaData['abaqus_version'] = self.abaqus_version
+		if self.verbose:
+			_logVerbose("Running on abaqus version: " + self.abaqus_version)
 
 		# Build the command to run the tests
-		cmd = ["python", self.test_runner_file_name]
+		cmd = ["python", self.test_runner_file_name, "--abaqusCmd", self.abaqus_cmd]
 		if self.time_tests: 
 			cmd.append("-t")
 		if self.tests_to_run:
@@ -429,7 +438,7 @@ def _generateReport(template, report, path_to_archived_tests=""):
 	ntestspass = report.summary['number_tests'] - report.summary['number_failed']
 	body_formatted_str = templ.body.format(fqdn=socket.getfqdn(), path_to_archived_tests=path_to_archived_tests, git_sha=report.metaData['sha'], test_results=test_result_formatted_str, 
 		number_of_tests_run=report.summary['number_tests'], total_duration=report.summary['duration'], num_tests_passed=ntestspass, 
-		num_tests_failed = report.summary['number_failed'])
+		num_tests_failed = report.summary['number_failed'], abaqus_version=report.metaData['abaqus_version'])
 
 	return body_formatted_str
 

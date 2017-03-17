@@ -10,6 +10,8 @@ body = """
 <font color='blue'>{fqdn}:{path_to_archived_tests}.zip</font><br><br>
 Git hash: {git_sha}
 <br><br>
+{abaqus_version}
+<br><br>
 Summary:<br>
 Number of tests that passed: {num_tests_passed} <br>
 Number of tests that failed: {num_tests_failed} <br>
