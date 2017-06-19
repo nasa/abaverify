@@ -100,7 +100,7 @@ class Automatic():
     # Public API
     #
     def __init__(self, test_directory, archive_directory, repository=None, test_runner_file_name='test_runner.py',
-        time_tests=True, force_tests=False, verbose=False, tests_to_run=[], abaqus_cmd='abaqus'):
+        time_tests=True, precompile=False, cpus=1, force_tests=False, verbose=False, tests_to_run=[], abaqus_cmd='abaqus'):
         """
         Creates an instance of Automatic.
 
@@ -154,11 +154,10 @@ class Automatic():
         self.time_tests = time_tests
         
         # Abaverify -c option. Precompile abaqus subroutine before running tests.
-        # TODO: I think this option is currently broken...
-        #self.pre_compile_subroutine = kwargs.get('pre_compile_subroutine', True)
+        self.precompile = precompile
 
-        # TODO Run with multiple cpus
-        #self.cpus = kwargs.get('cpus', True)
+        # Run with multiple cpus
+        self.cpus = cpus
         
         # Runs tests even if there are no changes to the repo
         self.force_tests = force_tests
@@ -233,6 +232,10 @@ class Automatic():
         cmd = ["python", self.test_runner_file_name, "--abaqusCmd", self.abaqus_cmd]
         if self.time_tests: 
             cmd.append("-t")
+        if self.precompile: 
+            cmd.append("-c")
+        if self.cpus > 1:
+            cmd.append("-C " + self.cpus)
         if self.tests_to_run:
             cmd = cmd + self.tests_to_run
         if self.verbose:
