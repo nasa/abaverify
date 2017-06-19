@@ -1,16 +1,22 @@
 """
-Opens an abaqus odb and gets requested results
+Opens an abaqus odb and gets requested results.
 
-Arguments:
- 1. jobName: name of the abaqus job (code expects an odb and a results text file with this name
-     in the working dir)
+Arguments
+---------
+    jobName: 
+        name of the abaqus job (code expects an odb and a results text file with this name
+        in the working dir)
 
-Sample usage:
+Example
+-------
 $ abaqus cae noGUI=model_runner.py -- jobName
 
-Output:
+Returns
+-------
 This code writes a file jobName_results.py with the reference value and the results collected from the job
 
+Notes
+-----
 Test types:
 1. max, min:
     Records the maximum or minimum value of the specified identifier. Assumes that only one identifier is specified.
@@ -24,8 +30,10 @@ Test types:
     as [min, max] where only values in x withing the bounds of the window are used in searching for the inflection
     point. The reference value and tolerance are specified as pairs corresponding to the x and y values [x, y].
     Numerical derivatives are calculated to find the inflection point. A Butterworth filter is used to smooth the data.
-    It is possible that this test could produce errorneous results if the data is too noisy for the filter settings.
+    It is possible that this test could produce erroneous results if the data is too noisy for the filter settings.
 4. disp_at_zero_y:
+    Records the displacement when the y-value reaches zero. This is useful for finding the maximum displacement in cohesive
+    laws.
 5. log_stress_at_failure_init:
     Writes specified stresses (stressComponents) when first failure index in failureIndices indicates failure (>= 1.0).
     This test assumes that the input deck terminates the analysis shortly after failure is reached by using the *Filter card.
@@ -33,6 +41,11 @@ Test types:
     additionalIdenitifiersToStore can be used to record additional outputs at the increment where failure occurs
     (e.g., alpha). Stress in stressComponents and other data in additionalIdenitifiersToStore are written to a log
     file that is named using the test base name.
+6. slope
+    Finds the slope of an x-y data curve.
+7. finalValue
+    Last output value.
+
 """
 
 
@@ -104,14 +117,14 @@ def listOfHistoryOutputSymbols():
 
 def parseJobName(name):
     """
-    Parses job name of paramtric tests
+    Parses job name of parametric tests
     """
 
     s = name.split("_")
 
     output = dict()
 
-    # Find the index of the first integer (value of paramter)
+    # Find the index of the first integer (value of parameter)
     idxFirstInt = 0
     while True:
         try:
@@ -123,7 +136,7 @@ def parseJobName(name):
     # Everything before the first integer is the basename
     output["baseName"] = "_".join(s[0:idxFirstInt-1])
 
-    # Assume everything after the basename is paramters and values
+    # Assume everything after the basename is parameters and values
     for n in range(idxFirstInt-1, len(s), 2):
         output[s[n]] = s[n+1]
 
@@ -372,7 +385,7 @@ for r in para["results"]:
     # Max, min
     if r["type"] in ("max", "min"):
 
-        # This trys to automatically determine the appropriate position specifier
+        # This tries to automatically determine the appropriate position specifier
         varName = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
 
         # Get the history data
@@ -431,7 +444,7 @@ for r in para["results"]:
         ldWindowed = session.xyDataObjects['windowed']
         odb.userData.XYData('windowed', ldWindowed)
 
-        # Calcuate the derivative using a moving window
+        # Calculate the derivative using a moving window
         xy = differentiate(session.xyDataObjects['windowed'])
         xy = resample(data=xy, numPts=10000)
 
@@ -605,7 +618,7 @@ for r in para["results"]:
         ldWindowed = session.xyDataObjects['windowed']
         odb.userData.XYData('windowed', ldWindowed)
 
-        # Calcuate the derivative
+        # Calculate the derivative
         xy = differentiate(session.xyDataObjects['windowed'])
         tmpName = xy.name
         session.xyDataObjects.changeKey(tmpName, 'slope_xy_diff')

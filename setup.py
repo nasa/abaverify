@@ -15,7 +15,7 @@ setup(
     name="abaverify",
     version=get_version("abaverify/_version.py"),
     url="https://github.com/nasa/abaverify",
-    license="NASA Open Source Agreemnt Version 1.3",
+    license="NASA Open Source Agreement Version 1.3",
     author="Andrew Bergan",
     author_email="andrew.c.bergan@nasa.gov",
     install_requires=["paramiko",],

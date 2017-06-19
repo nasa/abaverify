@@ -36,7 +36,7 @@ import abaverify as av
 
 
 # Create a classs to group your tests. Follow the same pattern as unittest.
-# You need to create atleast one test class and add atleast one test to it in order to do anything useful with this module.
+# You need to create atleast one test class and add at least one test to it in order to do anything useful with this module.
 # The assumption is that there is one 'test_' function defined for each model. Assertions are run for each nominal expected
 # result defined in the corresponding json file.
 class SingleElementTests(av.TestCase):
@@ -48,7 +48,7 @@ class SingleElementTests(av.TestCase):
         self.runTest('test_model2')
 
 
-# Optionally, create parametric tests by defininging a dicitionary of parameters to vary
+# Optionally, create parametric tests by defining a dictionary of parameters to vary
 class ParametricMixedModeMatrix(av.TestCase):
 
     # Specify meta class (Don't change this line)

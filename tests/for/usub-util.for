@@ -1,7 +1,7 @@
       
       subroutine ABQERR(lop, string, intv, realv, charv)
         ! Generic call to report error in subroutine
-        ! Abstracts the differences betwen implicit and explicit subroutines
+        ! Abstracts the differences between implicit and explicit subroutines
 
         ! Arguments (all are intent in)
         integer :: lop

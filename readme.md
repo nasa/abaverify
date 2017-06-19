@@ -29,7 +29,7 @@ repo_dir/
 The user subroutine is stored in the `for/` directory and the verification tests are stored in the `<your_userSubroutine_repo_dir>/tests/` directory.
 
 ### Install `abaverify`
-Abaverify can be installed using the python utility `pip` (8.x+). The following sections provide a short summary of how to use `pip` to install `abaverify`. Clone `abaverify` into a convienent directory:
+Abaverify can be installed using the python utility `pip` (8.x+). The following sections provide a short summary of how to use `pip` to install `abaverify`. Clone `abaverify` into a convenient directory:
 ```
 $  git clone https://developer.nasa.gov/struct-mech/abaverify.git
 ```
@@ -135,6 +135,7 @@ tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 -A ab
 ```
 tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 -C 4
 ```
+- `-d` or `--double` can be specified to run explicit jobs with double precision.
 - `-e` or `--useExistingBinaries` can be specified to reuse the most recent compiled version of the code.
 - `-i` or `--interactive` can be specified to print the Abaqus log data to the terminal.
 - `-r` or `--useExistingResults` can be specified to reuse the most recent test results. The net effect is that only the post-processing portion of the code is run, so you don't have to wait for the model to run just to debug a `_expected.py` file or `processresults.py`.

@@ -24,14 +24,43 @@ import pprint
 class _measureRunTimes:
     """
     Measures run times during unit tests
+
+    This is a helper class for recording the run times of abaqus jobs based on
+    the abaqus log file. The duration for linking, packaging, and the solver are
+    printed to the log file.
+
+    Attributes
+    ----------
+    Compile_start : :obj:`time`
+        Time at which the compiler started
+    Compile_end : :obj:`time`
+        Time at which the compiler ended 
+    packager_start : :obj:`time`
+        Time at which the packager started 
+    packager_end : :obj:`time`
+        Time at which the packager ended 
+    solver_start : :obj:`time`
+        Time at which the solver started
+    solver_end : :obj:`time`
+        Time at which the solver ended
+
     """
 
     def __init__(self):
-        self.runtimes = dict()
+        self.Compile_start = None
+        self.Compile_end = None
+        self.packager_start = None
+        self.packager_end = None
+        self.solver_start = None
+        self.solver_end = None
 
 
     def processLine(self, line):
-        """ Helper function to mark the start and end times """
+        """
+        This method should be called on the output from abaqus and is used to
+        identify the start and end times for the compiler, packager, and solver.
+
+        """
 
         if re.match(r'Begin Linking', line):
             self.Compile_start = time.time()
@@ -57,14 +86,38 @@ class _measureRunTimes:
 
 def _versiontuple(v):
     """
-    Converts a version string to a tuple
+    Converts a version string to a tuple.
+
+    Parameters
+    ----------
+    v : :obj:`str`
+        Version number as a string. For example: '1.1.1'
+
+    Returns
+    -------
+    tuple
+        Three element tuple with the version number. For example: (1, 1, 1)
+
     """
+
     return tuple(map(int, (v.split("."))))
 
 
 def _callAbaqus(cmd, log, timer=None, shell=True):
     """
-    Logic for calls to abaqus. Support streaming the output to the log file.
+    Calls abaqus and streams the output to the log file.
+
+    Parameters
+    ----------
+    cmd : :obj:`str`
+        Command to call abaqus. For example: 'abq6141'
+    log : filehandle
+        Filehandle for the log file.
+    timer : :obj:`_measureRunTimes`, optional
+        _measureRunTimes instance.
+    shell : bool, optional
+        Passed directly to subprocess.Popen.
+
     """
 
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, universal_newlines=True, shell=shell)
@@ -85,7 +138,20 @@ def _callAbaqus(cmd, log, timer=None, shell=True):
 
 def _callAbaqusOnRemote(cmd, log, timer=None):
     """
-    Logic for calls to abaqus on a remote server. Support streaming the output to the log file.
+    Calls abaqus on a remote server and streams the output to the log file.
+
+    This function is analogous to `_callAbaqus`. It provides the same
+    functionality, but for execution of an abaqus job on a remote server.
+
+    Parameters
+    ----------
+    cmd : :obj:`str`
+        Command to call abaqus. For example: 'abq6141'
+    log : :obj:`file`
+        Filehandle for the log file.
+    timer: :obj:`_measureRunTimes`, optional
+        _measureRunTimes instance.
+    
     """
 
     if options.verbose: print "Calling abaqus on the remote host"
@@ -107,8 +173,9 @@ def _callAbaqusOnRemote(cmd, log, timer=None):
 
 def _outputStreamer(proc, stream='stdout'):
     """
-    Hanldes streaming of subprocess.
-    Copied from: http://blog.thelinuxkid.com/2013/06/get-python-subprocess-output-without.html
+    Parses the streaming process output from subprocess.popen into strings for each line.
+
+    From: http://blog.thelinuxkid.com/2013/06/get-python-subprocess-output-without.html
     """
 
     newlines = ['\n', '\r\n', '\r']
@@ -132,7 +199,18 @@ def _outputStreamer(proc, stream='stdout'):
 
 def _compileCode(libName):
     """
-    Default procedure to pre-compile a subroutine using abaqus make
+    Pre-compiles a subroutine using abaqus make.
+    
+    This function is called when the user specifies that the subroutine should
+    be pre-compiled into a shared library object, but no function is provide to
+    compile the code. This is a default procedure for compiling subroutines with
+    abaqus make that is intended to be relatively general.  
+
+    Parameters
+    ----------
+    libName : :obj:`str`
+        Name of the subroutine fortran file without the file extension.
+
     """
 
     # Put a copy of the environment file in the /for directory
@@ -203,13 +281,13 @@ class TestCase(unittest.TestCase):
         Run a verification test.
 
         This method should be called to run a verification test. A verification
-        tests includes running an abaqus analysis, post-processing the results,
+        test includes running an abaqus analysis, post-processing the results,
         and running assertions on the results. This method includes logic that 
         performs each of these three steps.
 
         Parameters
         ----------
-        jobName : str
+        jobName : :obj:`str`
             The name of the abaqus input deck (without the .inp file extension). 
             Abaverify assumes that there is a corresponding file named 
             <jobName>_expected.py that defines the expected results.
@@ -275,11 +353,12 @@ class TestCase(unittest.TestCase):
 
         Parameters
         ----------
-        jobName : str
+        jobName : :obj:`str`
             The name of the abaqus input deck (without the .inp file extension).
         logFileHandle : :obj:`file`
-            A file handle to the file used for storing output
+            A file handle to the file used for storing output.
         timer : :obj:`_measureRunTimes`
+            An instance of `_measureRunTimes` to use for recording run times.
 
         """
 
@@ -324,8 +403,11 @@ class TestCase(unittest.TestCase):
             cmd += ' user="' + userSubPath + '"'
         if options.cpus > 1:
             cmd += ' cpus=' + str(options.cpus)
-        cmd += ' double=both interactive'
-        if options.verbose: print "Abaqus command: " + cmd
+        if options.double:
+            cmd += ' double=both'
+        cmd += ' interactive'
+        if options.verbose:
+            print "Abaqus command: " + cmd
 
         # Copy parameters file, if it exists
         if options.host == "localhost":
@@ -353,7 +435,7 @@ class TestCase(unittest.TestCase):
 
         Parameters
         ----------
-        jobName : str
+        jobName : :obj:`str`
             The name of the abaqus input deck (without the .inp file extension).
 
         """
@@ -387,7 +469,7 @@ class ParametricMetaClass(type):
     """
     Provides functionality for parametric testing.
 
-    Classes that inherit this class may have models defined inp decks or python 
+    Classes that inherit this class may have models defined as input decks or python 
     scripts.
 
     Expects that the inheriting class defines:
@@ -528,7 +610,7 @@ class ParametricMetaClass(type):
         except:
             print "baseName and parameters must be defined by the sub class"
 
-        # Get the cartesian product to yield a list of all the potential test cases
+        # Get the Cartesian product to yield a list of all the potential test cases
         testCases = list(dict(it.izip(parameters, x)) for x in it.product(*parameters.itervalues()))
 
         # Loop through each test
@@ -556,7 +638,7 @@ class ParametricMetaClass(type):
         return type.__new__(mcs, name, bases, dct)
 
 
-def runTests(relPathToUserSub, compileCodeFunc=None):
+def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
     """
     Main entry point for abaverify.
 
@@ -571,6 +653,11 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
     relPathToUserSub : path
         The relative path to the user subroutine to use for the verification
         tests. Omit the file extension.
+    double : boolean
+        If true, abaqus jobs are submitted with the double=both option. There is 
+        a command line option for double precision as well. Setting double here 
+        overrides the command line option so that double can be hard-coded on for 
+        explicit subroutines.
     compileCodeFunc : function, optional
         The function called to compile subroutines via abaqus make. This 
         functionality is used when compiling the subroutine once before running 
@@ -601,6 +688,7 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
     parser.add_option("-C", "--cpus", action="store", type="int", dest="cpus", default=1, help="Specify the number of cpus to run abaqus jobs with")
     parser.add_option("-R", "--remoteHost", action="store", type="string", dest="host", default="localhost", help="Run on remote host; e.g. user@server.com[:port][/path/to/run/dir]. Default run dir is <login_dir>/abaverify_temp/")
     parser.add_option("-V", "--verbose", action="store_true", dest="verbose", default=False, help="Print information for debugging")
+    parser.add_option("-d", "--double", action="store_true", dest="double", default=False, help="Run with double precision (double=both)")
     (options, args) = parser.parse_args()
 
     # Remove custom args so they do not get sent to unittest
@@ -613,7 +701,7 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
             if x in [h._short_opts[0] for h in parser.option_list]:
                 idx = [h._short_opts[0] for h in parser.option_list].index(x)
                 option = parser.option_list[idx]
-            elif  x in [h._long_opts[0] for h in parser.option_list]:
+            elif x in [h._long_opts[0] for h in parser.option_list]:
                 idx = [h._long_opts[0] for h in parser.option_list].index(x)
                 option = parser.option_list[idx]
             
@@ -629,6 +717,10 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
         pp.pprint(options.__dict__)
         print "Arguments passed to unittest:"
         pp.pprint(sys.argv)
+
+    # Double precision
+    if double:
+        options.double = True
 
     # Check version of script and notify the user if its out of date
     path_to_latest_ver_file = os.path.join(ABAVERIFY_INSTALL_DIR, 'latest.txt')
@@ -709,7 +801,7 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
             # Create dictionary to populate
             remote_opts = dict()
 
-        # Set deaults
+        # Set defaults
         if 'remote_run_directory' not in remote_opts:
             remote_opts['remote_run_directory'] = 'abaverify_temp'
         if 'local_files_to_copy_to_remote' not in remote_opts:
@@ -875,7 +967,7 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
                         if 'test_' in name:
                             calledMethods.append(name)
 
-                # 4. Get test_ methods list explicity in the arguments
+                # 4. Get test_ methods list explicitly in the arguments
                 for arg in sys.argv[1:]:
                     if len(arg.split('.')) == 2:
                         testName = arg.split('.')[1]
@@ -885,7 +977,7 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
                 # Now we have a list of the test methods that will be called
                 # print calledMethods
 
-                # Get a list of unique file names begining with 'test' in testOutput directory (w/o file extensions)
+                # Get a list of unique file names beginning with 'test' in testOutput directory (w/o file extensions)
                 uniquefileNames = list(set([f.split('.')[0] for f in os.listdir(testOutputPath) if 'test_' in f]))
 
                 # Check if any files exist in testOutput with these test names
@@ -944,7 +1036,7 @@ def runTests(relPathToUserSub, compileCodeFunc=None):
                 # Copy to /test/testOutput
                 shutil.copyfile(os.path.join(os.getcwd(), 'abaqus_v6.env'), os.path.join(os.getcwd(), 'testOutput', 'abaqus_v6.env'))
             else:
-                raise Exception("Missing environment file. Please configure a local abaqus environement file. See getting started in readme.")
+                raise Exception("Missing environment file. Please configure a local abaqus environment file. See getting started in readme.")
 
 
     try:

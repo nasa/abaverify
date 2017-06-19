@@ -13,7 +13,7 @@
 #source_file_regexp = r'.*\.for$'
 
 
-# Copy results back to local directory? [Defualt is False]
+# Copy results back to local directory? [Default is False]
 copy_results_to_local = True
 
 

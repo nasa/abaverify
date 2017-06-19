@@ -1,3 +1,17 @@
+"""
+This module provides functionality to run abaverify tests automatically.
+
+The intended use case of this module is for automatic verification testing of
+user subroutines during development. A script (see
+sample_automatic_testing_script.py for example) can be setup with cron for
+execution of verification tests at regular intervals.
+
+The functionality provided in this module includes generating reports of test
+results and run times, generating plots of current and archived run times (to
+show trends in run times), archiving results, and delivering reports via email.
+
+"""
+
 import os
 import sys
 import subprocess
@@ -27,17 +41,58 @@ from email.mime.multipart import MIMEMultipart
 from email import Encoders
 
 import pprint
-
-"""
-Functionality to run abaverify tests automatically.
-The intention is that a script (see sample_automatic_testing_script.py for example) triggered by cron would call run().
-"""
-
 pp = pprint.PrettyPrinter(indent=4)
+
+
 
 class Automatic():
     """
     Main functionality for the automatic module.
+
+    See `/scripts/sample_automatic_testing_script.py` and
+    `tests/tests/automatic_testing_script.py` for example of how to use the
+    functionality provided in this class.
+
+    Attributes
+    ----------
+    test_directory : :obj:`str`
+        Path to the directory with the tests to execute.
+    archive_directory : :obj:`str`
+        Path to the directory to use for storing the test results.
+    repository_name : :obj:`str`
+        Name of the user subroutine repository. This is used for naming files 
+        and reports.
+    repository_remote : :obj:`str`
+        Name of git remote for the upstream repository. Used for automatically 
+        executing `git pull` to ensure that the repo is up to date.
+    repository_branch : :obj:`str`
+        Name of the git branch for the upstream repository. Used for 
+        automatically executing `git pull` to ensure that the repo is up to date.
+    update_repo : bool
+        Determines if a `git pull` is executed.
+    test_runner_file_name : :obj:`str`
+        Name of the file that defines the tests. For example: test_runner.py
+    time_tests : bool
+        Record test durations if true.
+    precompile : bool
+        Compile the subroutine once before running all tests. Equivalent to abaverify 
+        -c command line option.
+    cpus : int
+        Run tests with the specified number of cpus.
+    force_tests : bool
+        Runs tests even if there are no changes to the repo.
+    verbose : bool
+        Logs details of parsing files. Useful for debugging.
+    tests_to_run : list
+        Tests to run. Defaults to all tests in test_runner_file_name.
+    test_report : :obj:`TestReport`
+        Test report instance.
+    formatted_reports : dict
+        Dictionary with each entry being a test results report formatted for 
+        humans.
+    run_time_plot_file_path : :obj:`str`
+        Path to the run time plots file.
+
     """
 
 
@@ -47,7 +102,11 @@ class Automatic():
     def __init__(self, test_directory, archive_directory, repository=None, test_runner_file_name='test_runner.py',
         time_tests=True, force_tests=False, verbose=False, tests_to_run=[], abaqus_cmd='abaqus'):
         """
-        Setup Automatic with user defined options (kwargs)
+        Creates an instance of Automatic.
+
+        Most of the arguments correspond with public attributes and can be set in
+        the constructor or by modifying the attribute directly. 
+
         """
 
         #-------------------------------------------------------------------------------
@@ -82,7 +141,7 @@ class Automatic():
         elif repository is None:
             self.repository_name = self._getRepoName()
         else:
-            raise ValueError("The argument repository for Automatic intialization must be a string or a dictionary.")
+            raise ValueError("The argument repository for Automatic initialization must be a string or a dictionary.")
         
         # Update repo
         if self.update_repo:
@@ -136,15 +195,20 @@ class Automatic():
 
     def run(self):
         """
-        Build a testReport object with all the repo info and testResults
-        Store the testReport to the object instance
+        Run the tests and build a testReport object with the results.
+
+        This function runs the tests using the current configuration. Once the
+        configuration has been setup using the object constructor and/or by
+        modifying the attributes, use this function to run the analysis test
+        cases.
+
         """
 
         # Get the sha of the current commit
         sha = subprocess.check_output("git rev-parse --short HEAD", shell=True).rstrip()
         self.test_report.metaData['sha'] = sha
 
-        # Check if there are uncommited changes
+        # Check if there are uncommitted changes
         try:
             subprocess.check_call('git diff --quiet', shell=True)
             self.test_report.metaData['uncommited_changes'] = False
@@ -204,6 +268,31 @@ class Automatic():
 
 
     def generateReport(self, template):
+        """
+        Returns a report (string) containing the test results.
+
+        This function uses a basic templating approach to generate a report
+        using the test results and the supplied report template. The report
+        template file is used to format the report. It is presumed that the
+        report is formatted with html, though other mark up languages should be
+        compatible.
+
+        Parameters
+        ----------
+        template : :obj:`str`
+            String specifying the name of python file (without the .py
+            extension). The template file must be located in the `templates`
+            directory, the current directory, or somewhere else in the python 
+            path. The template file should follow the pattern of the sample
+            report template `template_email_summary`.
+
+        Returns
+        -------
+        string
+            String containing the complete report with results substituted.
+
+        """
+
         sha = self.test_report.metaData['sha']
         
         # Build the report
@@ -222,6 +311,9 @@ class Automatic():
 
     @classmethod
     def generateReport2(cls, template, report, saveAs):
+        """
+        Static call to generateReport. Here for debugging purposes.
+        """
         rpt_str = _generateReport(template=template, report=report)
         with open(saveAs, 'w') as outfile:
             outfile.write(rpt_str)
@@ -230,8 +322,34 @@ class Automatic():
 
     def generateRunTimePlots(self, template):
         """
-        Build plots with plotly
+        Create run time plots using the plotly library.
+
+        This function uses a templating approach to generate an html file
+        containing plotly plots of run time. The run times of historical tests
+        are used to show the trends in run time. The file is returned as a
+        string.
+
+        Parameters
+        ----------
+        template : :obj:`str`
+            String specifying the name of python file (without the .py
+            extension). The template file must be located in the `templates`
+            directory, the current directory, or somewhere else in the python 
+            path. The template file should follow the pattern of the sample
+            report template `template_run_time_plots`.
+
+        Returns
+        -------
+        string
+            String containing the html file with the plots.
+
+        Notes
+        -----
+        See the CompDam_DGD repository for a full-featured implementation of the 
+        run time plot functionality.
+
         """
+
         plt_str = _generateRunTimePlots(template=template, path_to_archived_tests=self.archive_directory, verbose=self.verbose)
         
         # Name for report file
@@ -250,7 +368,7 @@ class Automatic():
     @classmethod
     def generateRunTimePlots2(cls, template, path_to_archived_tests, saveAs, verbose=False):
         """
-        Build plots with plotly
+        Static call to generateRunTimePlots. Here for debugging purposes.
         """
         plt_str = _generateRunTimePlots(template=template, path_to_archived_tests=path_to_archived_tests, verbose=verbose)
         with open(saveAs, 'w') as outfile:
@@ -258,15 +376,29 @@ class Automatic():
         return plt_str
 
 
-    def commitReportToGitHub(self, repo_info):
-        """
-        Options should be set at instantiation
-        """
-
-
     def emailResults(self, recipients, sender, template, attachments=[]):
         """
-        TODO: include options to attach plots etc from jobs (ie failure envelope plots)
+        Email test results.
+
+        This function is useful to alert people of the test results immediately
+        when the tests complete.
+
+        Parameters
+        ----------
+        recipients : list of str or str
+            Email addresses of recipients.
+        sender : :obj:`str`
+            Email sender. For example: noreply@domain.com
+        template : :obj:`str`
+            String specifying the name of python file (without the .py
+            extension). The template file must be located in the `templates`
+            directory, the current directory, or somewhere else in the python 
+            path. The template file should follow the pattern of the sample
+            report template `template_email_summary`.
+        attachments : list, optional
+            List of paths to files that should be included as attachments in the 
+            email.
+
         """
 
         # If the report has already been run, use it
@@ -299,17 +431,15 @@ class Automatic():
 
     @classmethod
     def emailResults2(cls, recipients, sender, body, attachments=[], repository_info=None):
+        """
+        Static call to emailResults. Here for debugging purposes.
+        """
         if repository_info is None:
             repository_info = {'name': 'repo_name_placeholder', 'branch': 'repo_branch_placeholder'}
 
         _emailResults(recipients, sender, body, attachments, repository_info)
         return
 
-
-    def archiveReports(self):
-        """
-        TODO: this is designed to be called once all reports are prepared. archive reports to archive directory.
-        """
 
     #
     # Locals
@@ -421,7 +551,7 @@ def _generateReport(template, report, path_to_archived_tests=""):
     Return the template with the test report data substituted 
     """
 
-    # TODO add some logic to check if template is in working directory, if not search templates dir
+    # Add the templates directory to the path
     pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
     sys.path.append(os.path.join(pathForThisFile, os.pardir, 'templates'))
 
@@ -450,7 +580,7 @@ def _generateRunTimePlots(template, path_to_archived_tests, verbose=False):
     Returns a string containing the html
     """
 
-    # TODO add some logic to check if template is in working directory, if not search templates dir
+    # Add the templates directory to the path
     pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
     sys.path.append(os.path.join(pathForThisFile, os.pardir, 'templates'))
 
@@ -529,7 +659,6 @@ def _generateRunTimePlots(template, path_to_archived_tests, verbose=False):
         templ.chart_groups = {}
 
     # Loop trhough chart_groups
-    # TODO sort keys
     for chart_group_key in templ.chart_groups.keys():
                 
         subsection_toc = ""
@@ -635,7 +764,7 @@ def _emailResults(recipients, sender, body, attachments, repository_info):
 
 def _outputStreamer(proc, stream='stdout'):
     """
-    Hanldes streaming of subprocess.
+    Handles streaming of subprocess.
     Copied from: http://blog.thelinuxkid.com/2013/06/get-python-subprocess-output-without.html
     """
 

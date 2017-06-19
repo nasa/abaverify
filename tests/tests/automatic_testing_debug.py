@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
     elif feature == 'email':
         if len(options.email_recipients) < 1:
-            raise ValueError("Must specify recipeints via the -e option to use the email feature.")
+            raise ValueError("Must specify recipients via the -e option to use the email feature.")
         email(archiveTestResultsJSONFile=options.report_json_file, templateName=template, 
             recipient=options.email_recipients, saveAs=options.output)
 

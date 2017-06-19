@@ -39,13 +39,3 @@ if result:
     
     av_auto.emailResults(recipients="andrew.c.bergan@nasa.gov", sender="noreply@nasa.gov", 
         template='template_email_summary', attachments=attach)
-
-    
-
-
-# TODO - implement below:
-
-# # Post the results to github
-# html_test_list = av_auto.generateReport('my_cool_template_file')
-# html_plots = av_auto.generateRunTimePlots('a_template_for_plotting')
-# av_auto.commitReportToGitHub([html_test_list, html_plots], github_info)
