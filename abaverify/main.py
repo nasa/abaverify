@@ -754,11 +754,10 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
             current_version = match.group(1)
 
         # Compare versions
-        if _versiontuple("0.3.0") > _versiontuple(current_version):
-            print "  NOTICE: Version {0} of abaverify available, consider upgrading from your current version ({1})".format(latest_version, current_version)
+        if _versiontuple(latest_version) > _versiontuple(current_version):
+            print "  NOTICE: Version {0} of abaverify is available, consider upgrading from your current version ({1})".format(latest_version, current_version)
         else:
-            if options.verbose:
-                print "Checked for updates; none found."
+            print "Checked for updates; none found."
 
     # Remote host
     #
