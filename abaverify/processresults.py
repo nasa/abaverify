@@ -50,21 +50,19 @@ Test types:
 
 
 from abaqus import *
-import abaqusConstants
 from abaqusConstants import *
 from caeModules import *
-import job
 import os
 import inspect
 import sys
 import re
-import shutil
 import numpy as np
 from operator import itemgetter
 
 # This is a crude hack, but its working
 pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 sys.path.insert(0, pathForThisFile)
+
 
 # Throw-away debugger
 def debug(obj):
@@ -79,9 +77,9 @@ def interpolate(x, xp, fp):
     if np.all(np.diff(xp) > 0):
         return np.interp(x, xp, fp)
     else:
-        if all([i<0 for i in xp]):
+        if all([i < 0 for i in xp]):
             xpos = np.absolute(xp)
-            return np.interp(-1*x, xpos, fp)
+            return np.interp(-1 * x, xpos, fp)
         else:
             raise Exception("Functionality to interpolate datasets that traverse 0 or are unsorted is not implemented")
 
@@ -134,11 +132,11 @@ def parseJobName(name):
             idxFirstInt += 1
 
     # Everything before the first integer is the basename
-    output["baseName"] = "_".join(s[0:idxFirstInt-1])
+    output["baseName"] = "_".join(s[0:idxFirstInt - 1])
 
     # Assume everything after the basename is parameters and values
-    for n in range(idxFirstInt-1, len(s), 2):
-        output[s[n]] = s[n+1]
+    for n in range(idxFirstInt - 1, len(s), 2):
+        output[s[n]] = s[n + 1]
 
     return output
 
@@ -155,7 +153,7 @@ def _historyOutputNameHelperNode(prefixString, identifier, steps):
         else:
             step = steps[0]
         for historyRegions in odb.steps[step].historyRegions.keys():
-            regionLabels = [x for x in odb.steps[step].historyRegions.keys() if odb.steps[step].historyRegions[x].historyOutputs.has_key(i)]
+            regionLabels = [x for x in odb.steps[step].historyRegions.keys() if i in odb.steps[step].historyRegions[x].historyOutputs]
             if len(regionLabels) == 1:
                 labelSplit = regionLabels[0].split(' ')
                 if labelSplit[0] == 'Node' and len(labelSplit) == 2:
@@ -218,14 +216,14 @@ def historyOutputNameFromIdentifier(identifier, steps=None):
     """
 
     # Handle case of a list of identifiers
-    if type(identifier) == type(list()):
+    if isinstance(identifier, list):
         out = list()
         for i in identifier:
             out.append(historyOutputNameFromIdentifier(identifier=i, steps=steps))
         return tuple(out)
 
     # Case when identifier is a dictionary
-    elif type(identifier) == type(dict()):
+    elif isinstance(identifier, dict):
         if "symbol" in identifier:
             i = str(identifier["symbol"])
 
@@ -260,7 +258,7 @@ def historyOutputNameFromIdentifier(identifier, steps=None):
             raise ValueError("Identifier missing symbol definition")
 
     # Case when the identifer is specified directly
-    elif type(identifier) == type(str()) or type(identifier) == type(unicode()):
+    elif isinstance(identifier, (str, unicode)):
         return str(identifier)
     else:
         raise ValueError("Expecting that the argument is a list, dict, or str. Found " + str(type(identifier)))
@@ -282,51 +280,51 @@ def write_results(results_to_write, fileName, depth=0):
     else:
         f = open(fileName, 'a')
 
-    if type(results_to_write) == type(dict()):
+    if isinstance(results_to_write, dict):
 
-        f.write('\t'*depth + '{\n')
+        f.write('\t' * depth + '{\n')
 
         for r in results_to_write:
 
-            f.write('\t'*depth + '"' + r + '": ')
+            f.write('\t' * depth + '"' + r + '": ')
 
-            if (type(results_to_write[r]) == type(dict()) or type(results_to_write[r]) == type(list())):
+            if isinstance(results_to_write[r], (dict, list)):
                 f.write('\n')
                 f.close()
                 write_results(results_to_write[r], fileName, depth + 1)
                 f = open(fileName, 'a')
 
-            elif type(results_to_write[r]) == type(str()):
+            elif isinstance(results_to_write[r], str):
                 f.write('"' + str(results_to_write[r]) + '",\n')
             else:
                 f.write(str(results_to_write[r]) + ',\n')
 
         if depth == 0:
-            f.write('\t'*depth + '}\n')
+            f.write('\t' * depth + '}\n')
         else:
-            f.write('\t'*depth + '},\n')
+            f.write('\t' * depth + '}, \n')
 
-    elif type(results_to_write) == type(list()):
+    elif isinstance(results_to_write, list):
 
-        f.write('\t'*depth + '[\n')
+        f.write('\t' * depth + '[\n')
 
         for r in results_to_write:
 
-            if (type(r) == type(dict()) or type(r) == type(list())):
+            if isinstance(r, (dict, list)):
                 f.close()
                 write_results(r, fileName, depth + 1)
                 f = open(fileName, 'a')
 
-            elif type(r) == type(str()):
-                f.write('\t'*depth + '"' + str(r) + '",\n')
+            elif isinstance(r, str):
+                f.write('\t' * depth + '"' + str(r) + '", \n')
 
             else:
-                f.write('\t'*depth + str(r) + ',\n')
+                f.write('\t' * depth + str(r) + ', \n')
 
         if depth == 0:
-            f.write('\t'*depth + ']\n')
+            f.write('\t' * depth + ']\n')
         else:
-            f.write('\t'*depth + '],\n')
+            f.write('\t' * depth + '],\n')
 
 
 debug(os.getcwd())
@@ -401,7 +399,6 @@ for r in para["results"]:
             r["computedValue"] = min([pt[1] for pt in xyDataObj])
         testResults.append(r)
 
-
     # Enforce continuity
     elif r["type"] == "continuous":
 
@@ -412,9 +409,8 @@ for r in para["results"]:
         xyDataObj = session.XYDataFromHistory(name='XYData-1', odb=odb, outputVariableName=varName, steps=steps)
 
         # Get the maximum change in the specified value
-        r["computedValue"] = max([max(r["referenceValue"], abs(xyDataObj[x][1] - xyDataObj[x-1][1])) for x in range(2,len(xyDataObj))])
+        r["computedValue"] = max([max(r["referenceValue"], abs(xyDataObj[x][1] - xyDataObj[x - 1][1])) for x in range(2, len(xyDataObj))])
         testResults.append(r)
-
 
     elif r["type"] == "xy_infl_pt":
         varNames = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
@@ -432,13 +428,14 @@ for r in para["results"]:
 
         # Locals
         xyData = xy
-        windowMin=r["window"][0]
-        windowMax=r["window"][1]
+        windowMin = r["window"][0]
+        windowMax = r["window"][1]
 
         # Select window
-        windowed = [x for x in xyData if x[0] > windowMin and x[0] < windowMax]
-        if len(windowed) == 0: raise Exception("No points found in specified window")
-        if min([abs(windowed[i][0]-windowed[i-1][0]) for i in range(1, len(windowed))]) == 0:
+        windowed = [xi for xi in xyData if xi[0] > windowMin and xi[0] < windowMax]
+        if len(windowed) == 0:
+            raise Exception("No points found in specified window")
+        if min([abs(windowed[i][0] - windowed[i - 1][0]) for i in range(1, len(windowed))]) == 0:
             raise "ERROR"
         session.XYData(data=windowed, name="windowed")
         ldWindowed = session.xyDataObjects['windowed']
@@ -469,14 +466,13 @@ for r in para["results"]:
         odb.userData.XYData('dslope', dslope)
         x, y = zip(*dslope)
         y = np.absolute(y)
-        dslope = zip(x,y)
+        dslope = zip(x, y)
         xMax, yMax = max(dslope, key=itemgetter(1))
 
         # Store the x, y pair at the inflection point
         x, y = zip(*session.xyDataObjects['windowed'])
         r["computedValue"] = (xMax, interpolate(xMax, x, y))
         testResults.append(r)
-
 
     elif r["type"] == "disp_at_zero_y":
         varNames = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
@@ -491,11 +487,11 @@ for r in para["results"]:
             windowMin = r["window"][0]
             windowMax = r["window"][1]
         else:
-            windowMin = r['referenceValue'] - 2*r['tolerance']
-            windowMax = r['referenceValue'] + 2*r['tolerance']
+            windowMin = r['referenceValue'] - 2 * r['tolerance']
+            windowMax = r['referenceValue'] + 2 * r['tolerance']
 
         # Use subset of full traction-separation response
-        windowed = [x for x in xy if x[0] > windowMin and x[0] < windowMax]
+        windowed = [xi for xi in xy if xi[0] > windowMin and xi[0] < windowMax]
 
         # Tolerance to zero
         if "zeroTol" not in r:
@@ -514,7 +510,6 @@ for r in para["results"]:
 
         r["computedValue"] = disp_crit
         testResults.append(r)
-
 
     elif r["type"] == "log_stress_at_failure_init":
 
@@ -547,7 +542,7 @@ for r in para["results"]:
                     raise NotImplementedError("Multiple failure modes occurred at the same increment")
                 continue
             else:
-                if failed[0][i][1] >= 1.0 and failed[0][i-1][1] < 1.0:
+                if failed[0][i][1] >= 1.0 and failed[0][i - 1][1] < 1.0:
                     inc = i
                     break
 
@@ -571,7 +566,6 @@ for r in para["results"]:
             odb.userData.XYData(n, xy)
             additionalData[n] = xy[inc][1]
 
-
         # Get job name
         jnparsed = parseJobName(jobName)
 
@@ -589,7 +583,6 @@ for r in para["results"]:
         with open(logFileName, "a") as f:
             f.write(dataToWrite)
 
-
     elif r["type"] == "slope":
         varNames = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
 
@@ -606,13 +599,14 @@ for r in para["results"]:
 
         # Locals
         xyData = xy
-        windowMin=r["window"][0]
-        windowMax=r["window"][1]
+        windowMin = r["window"][0]
+        windowMax = r["window"][1]
 
         # Select window
-        windowed = [x for x in xyData if x[0] > windowMin and x[0] < windowMax]
-        if len(windowed) == 0: raise Exception("No points found in specified window")
-        if min([abs(windowed[i][0]-windowed[i-1][0]) for i in range(1, len(windowed))]) == 0:
+        windowed = [xi for xi in xyData if xi[0] > windowMin and xi[0] < windowMax]
+        if len(windowed) == 0:
+            raise Exception("No points found in specified window")
+        if min([abs(windowed[i][0] - windowed[i - 1][0]) for i in range(1, len(windowed))]) == 0:
             raise "ERROR"
         session.XYData(data=windowed, name="windowed")
         ldWindowed = session.xyDataObjects['windowed']
@@ -628,7 +622,6 @@ for r in para["results"]:
         x, y = zip(*session.xyDataObjects['slope_xy_diff'])
         r["computedValue"] = np.mean(y)
         testResults.append(r)
-
 
     elif r["type"] == "finalValue":
         # This trys to automatically determine the appropriate position specifier
@@ -656,7 +649,7 @@ fileName = os.path.join(os.getcwd(), jobName + '_results.py')
 # Remove the old results file if it exists
 try:
     os.remove(fileName)
-except:
+except Exception:
     pass
 
 write_results(testResults, fileName)

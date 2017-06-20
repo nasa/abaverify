@@ -13,10 +13,12 @@ def reportGenerator(archiveTestResultsJSONFile, templateName, outfile):
     av.Automatic.generateReport2(template=templateName, report=report, saveAs=fp)
     return fp
 
+
 def email(archiveTestResultsJSONFile, templateName, recipient, saveAs):
     fp = reportGenerator(archiveTestResultsJSONFile, templateName, saveAs)
     av.Automatic.emailResults2(recipients=[recipient, ], sender='noreply@nasa.gov', body=fp)
     return
+
 
 def runTimePlots(template, path_to_archived_tests, saveAs):
     av.Automatic.generateRunTimePlots2(template, path_to_archived_tests, saveAs)
@@ -48,7 +50,7 @@ if __name__ == '__main__':
         if len(options.email_recipients) < 1:
             raise ValueError("Must specify recipients via the -e option to use the email feature.")
         email(archiveTestResultsJSONFile=options.report_json_file, templateName=template, 
-            recipient=options.email_recipients, saveAs=options.output)
+              recipient=options.email_recipients, saveAs=options.output)
 
     elif feature == 'runTimePlots':
         if not options.output:

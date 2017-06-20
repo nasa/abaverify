@@ -60,9 +60,9 @@ class ParametricMixedModeMatrix(av.TestCase):
     # Range of parameters to test; all combinations are tested
     # alpha is the angle of the crack normal
     # beta defines the direction of tensile loading in Step-1 and compressive loading in Step-2
-    parameters = {'alpha': range(0,50,10), 'beta': range(0,210,30), 'friction': [0.00, 0.15, 0.30, 0.45, 0.60]}
-
-
+    parameters = {'alpha': range(0, 50, 10), 
+                  'beta': range(0, 210, 30), 
+                  'friction': [0.00, 0.15, 0.30, 0.45, 0.60]}
 
 # That's it for setup. Add as many tests as you want!
 

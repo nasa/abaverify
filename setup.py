@@ -1,5 +1,6 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 import re
+
 
 def get_version(path):
     version_file_as_str = open(path, "rt").read()
@@ -19,5 +20,5 @@ setup(
     author="Andrew Bergan",
     author_email="andrew.c.bergan@nasa.gov",
     install_requires=["paramiko", "plotly"],
-    packages=["abaverify",],
+    packages=["abaverify", ],
 )

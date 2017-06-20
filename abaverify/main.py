@@ -21,6 +21,7 @@ import pprint
 # Local
 #
 
+
 class _measureRunTimes:
     """
     Measures run times during unit tests
@@ -53,7 +54,6 @@ class _measureRunTimes:
         self.packager_end = None
         self.solver_start = None
         self.solver_end = None
-
 
     def processLine(self, line):
         """
@@ -127,7 +127,7 @@ def _callAbaqus(cmd, log, timer=None, shell=True):
 
         # Time tests
         if options.time:
-            if timer != None:
+            if timer is not None:
                 timer.processLine(line)
 
         # Log data
@@ -151,17 +151,18 @@ def _callAbaqusOnRemote(cmd, log, timer=None):
         Filehandle for the log file.
     timer: :obj:`_measureRunTimes`, optional
         _measureRunTimes instance.
-    
+
     """
 
-    if options.verbose: print "Calling abaqus on the remote host"
+    if options.verbose:
+        print "Calling abaqus on the remote host"
     stdin, stdout, stderr = options.ssh.exec_command('cd ' + options.remote_run_directory + '; ' + cmd + ' >& /dev/stdout')
     stdin.close()
     for line in iter(lambda: stdout.readline(2048), ""):
 
         # Time tests
         if options.time:
-            if timer != None:
+            if timer is not None:
                 timer.processLine(line)
 
         # Log data
@@ -200,7 +201,7 @@ def _outputStreamer(proc, stream='stdout'):
 def _compileCode(libName):
     """
     Pre-compiles a subroutine using abaqus make.
-    
+
     This function is called when the user specifies that the subroutine should
     be pre-compiled into a shared library object, but no function is provide to
     compile the code. This is a default procedure for compiling subroutines with
@@ -226,7 +227,7 @@ def _compileCode(libName):
         shell = True
     try:
         f = open(os.path.join(os.getcwd(), os.pardir, 'tests', 'testOutput', 'compile.log'), 'a')
-        _callAbaqus(cmd=['abaqus', 'make', 'library='+libName], log=f, shell=shell)
+        _callAbaqus(cmd=['abaqus', 'make', 'library=' + libName], log=f, shell=shell)
     finally:
         f.close()
 
@@ -239,7 +240,7 @@ def _compileCode(libName):
 
     # Copy binaries into /build
     numBinariesFound = 0
-    pattern  = re.compile('.*(\.dll|\.obj|\.so|\.o)$')
+    pattern = re.compile('.*(\.dll|\.obj|\.so|\.o)$')
     for f in os.listdir(os.getcwd()):
         if pattern.match(f):
             numBinariesFound += 1
@@ -251,7 +252,6 @@ def _compileCode(libName):
 
     # Change directory to /tests/
     os.chdir(os.path.join(os.pardir, 'tests'))
-
 
 
 #
@@ -275,7 +275,6 @@ class TestCase(unittest.TestCase):
         patterns = [re.compile('.*abaqus.*\.rpy.*'), re.compile('.*abaqus.*\.rec.*'), re.compile('.*pyc')]
         [os.remove(f) for f in files if any(regex.match(f) for regex in patterns)]
 
-
     def runTest(self, jobName):
         """
         Run a verification test.
@@ -294,7 +293,8 @@ class TestCase(unittest.TestCase):
 
         """
 
-        if options.verbose or options.interactive: print ""
+        if options.verbose or options.interactive:
+            print ""
 
         # Save output to a log file
         with open(os.path.join(os.getcwd(), 'testOutput', jobName + '.log'), 'w') as f:
@@ -316,32 +316,31 @@ class TestCase(unittest.TestCase):
                 pathForProcessResultsPy = '"' + os.path.join(ABAVERIFY_INSTALL_DIR, 'processresults.py') + '"'
                 _callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName, log=f, timer=timer)
 
-            else: # Remote host
+            else:  # Remote host
                 self.callAbaqusOnRemote(cmd=options.abaqusCmd + ' cae noGUI=processresults.py -- -- ' + jobName, log=f, timer=timer)
                 try:
                     ftp = options.ssh.open_sftp()
                     ftp.chdir(options.remote_run_directory)
                     try:
                         ftp.get(jobName + '_results.py', 'testOutput/' + jobName + '_results.py')
-                    except:
+                    except Exception:
                         pass
                     if options.remote['copy_results_to_local']:
                         for ext in options.remote['file_extensions_to_copy_to_local']:
                             try:
                                 ftp.get(jobName + ext, 'testOutput/' + jobName + ext)
-                            except:
+                            except Exception:
                                 pass
                         for fn in options.remote['files_to_copy_to_local']:
                             try:
                                 ftp.get(fn, 'testOutput/' + fn)
-                            except:
+                            except Exception:
                                 pass
                 finally:
                     ftp.close()
 
         # Run assertions
         self._runAssertionsOnResults(jobName)
-
 
     def _runModel(self, jobName, logFileHandle, timer):
         """
@@ -381,7 +380,8 @@ class TestCase(unittest.TestCase):
                 userSubPath = os.path.join(os.getcwd(), options.relPathToUserSub + subext)
             else:
                 userSubPath = os.path.basename(options.relPathToUserSub) + subext
-            if options.verbose: print "Using subroutine: " + userSubPath
+            if options.verbose:
+                print "Using subroutine: " + userSubPath
 
         # Copy input deck
         if options.host == "localhost":
@@ -391,9 +391,11 @@ class TestCase(unittest.TestCase):
                 ftp = options.ssh.open_sftp()
                 ftp.chdir(options.remote_run_directory)
                 ftp.put(jobName + '.inp', jobName + '.inp')
-                if options.verbose: print "Copying: " + jobName + '.inp'
+                if options.verbose:
+                    print "Copying: " + jobName + '.inp'
                 ftp.put(jobName + '_expected.py', jobName + '_expected.py')
-                if options.verbose: print "Copying: " + jobName + '_expected.py'
+                if options.verbose:
+                    print "Copying: " + jobName + '_expected.py'
             finally:
                 ftp.close()
 
@@ -423,7 +425,6 @@ class TestCase(unittest.TestCase):
             os.chdir(os.pardir)
         else:
             _callAbaqusOnRemote(cmd=cmd, log=logFileHandle, timer=timer)
-
 
     def _runAssertionsOnResults(self, jobName):
         """
@@ -483,7 +484,7 @@ class ParametricMetaClass(type):
 
     [optional] expectedpy_parameters: a dictionary with the result for each 
     parameter value
-    
+
     More info on meta classes: http://stackoverflow.com/a/20870875
 
     """
@@ -499,12 +500,12 @@ class ParametricMetaClass(type):
 
             jobName = testCase['name']
             baseName = testCase['baseName']
-            parameters = {k: v for k, v in items if not k in ('baseName', 'name')}
-
+            parameters = {k: v for k, v in items if k not in ('baseName', 'name')}
 
             def test(self):
 
-                if options.verbose or options.interactive: print ""
+                if options.verbose or options.interactive:
+                    print ""
 
                 try:
                     # Create the input deck
@@ -566,25 +567,25 @@ class ParametricMetaClass(type):
                             pathForProcessResultsPy = '"' + os.path.join(ABAVERIFY_INSTALL_DIR, 'processresults.py') + '"'
                             _callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName, log=f, timer=timer)
 
-                        else: # Remote host
+                        else:  # Remote host
                             _callAbaqusOnRemote(cmd=options.abaqusCmd + ' cae noGUI=processresults.py -- -- ' + jobName, log=f, timer=timer)
                             try:
                                 ftp = options.ssh.open_sftp()
                                 ftp.chdir(options.remote_run_directory)
                                 try:
                                     ftp.get(jobName + '_results.py', 'testOutput/' + jobName + '_results.py')
-                                except:
+                                except Exception:
                                     pass
                                 if options.remote['copy_results_to_local']:
                                     for ext in options.remote['file_extensions_to_copy_to_local']:
                                         try:
                                             ftp.get(jobName + ext, 'testOutput/' + jobName + ext)
-                                        except:
+                                        except Exception:
                                             pass
                                     for fn in options.remote['files_to_copy_to_local']:
                                         try:
                                             ftp.get(fn, 'testOutput/' + fn)
-                                        except:
+                                        except Exception:
                                             pass
                             finally:
                                 ftp.close()
@@ -594,10 +595,9 @@ class ParametricMetaClass(type):
 
                 finally:  # Make sure temporary files are removed
                     os.remove(jobName + '.inp')  # Delete temporary parametric input file
-                    os.remove(jobName + '_expected.py') # Delete temporary parametric expected results file
+                    os.remove(jobName + '_expected.py')  # Delete temporary parametric expected results file
                     if 'pythonScriptForModel' in testCase:
                         os.remove(jobName + '.py')
-
 
             # Rename the test method and return the test
             test.__name__ = jobName
@@ -607,20 +607,20 @@ class ParametricMetaClass(type):
         try:
             baseName = dct['baseName']
             parameters = dct['parameters']
-        except:
+        except Exception:
             print "baseName and parameters must be defined by the sub class"
 
         # Get the Cartesian product to yield a list of all the potential test cases
         testCases = list(dict(it.izip(parameters, x)) for x in it.product(*parameters.itervalues()))
 
         # Loop through each test
-        for i in range(0,len(testCases)):
+        for i in range(0, len(testCases)):
 
             # Add a name to each test case
             # Generate portion of test name based on particular parameter values
             pn = '_'.join(['%s_%s' % (key, value) for (key, value) in testCases[i].items()])
             # Replace periods with commas so windows doesn't complain about file names
-            pn = re.sub('[.]','',pn)
+            pn = re.sub('[.]', '', pn)
             # Add the test case name; concatenate the base name and parameter name
             testCases[i].update({'name': baseName + '_' + pn})
             testCases[i].update({'baseName': baseName})
@@ -628,7 +628,7 @@ class ParametricMetaClass(type):
                 testCases[i].update({'pythonScriptForModel': dct['pythonScriptForModel']})
             if 'expectedpy_parameters' in dct:
                 exp_dict = {}
-                for k, v in  dct['expectedpy_parameters'].iteritems():
+                for k, v in dct['expectedpy_parameters'].iteritems():
                     exp_dict[k] = v[i]
                 testCases[i].update(exp_dict)
 
@@ -642,9 +642,9 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
     """
     Main entry point for abaverify.
 
-    This is the main entry point for abaverify. It should be called as follows 
-    at the bottom of the script that imports abaverify: 
-    
+    This is the main entry point for abaverify. It should be called as follows
+    at the bottom of the script that imports abaverify:
+
     if __name__ == "__main__":
         av.runTests(relPathToUserSub='../for/vumat')
 
@@ -671,7 +671,6 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
     global ABAVERIFY_INSTALL_DIR
     global options
 
-
     # Directory where this file is located
     ABAVERIFY_INSTALL_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -694,7 +693,7 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
     # Remove custom args so they do not get sent to unittest
     # http://stackoverflow.com/questions/1842168/python-unit-test-pass-command-line-arguments-to-setup-of-unittest-testcase
     # Loop through known options
-    for x in sum([h._long_opts+h._short_opts for h in parser.option_list],[]):
+    for x in sum([h._long_opts + h._short_opts for h in parser.option_list], []):
         # Check if the known option is an argument 
         if x in sys.argv:
             # Get the option object
@@ -704,11 +703,11 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
             elif x in [h._long_opts[0] for h in parser.option_list]:
                 idx = [h._long_opts[0] for h in parser.option_list].index(x)
                 option = parser.option_list[idx]
-            
+
             # If the option has additional info (e.g. -A abq6141), remove both from argv
             if option.type in ["string", "int"]:
                 idx = sys.argv.index(x)
-                del sys.argv[idx:idx+2]
+                del sys.argv[idx:idx + 2]
             else:
                 sys.argv.remove(x)
     if options.verbose:
@@ -739,7 +738,7 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
                 h.write(latest_version)
             # with open(os.path.join(ABAVERIFY_INSTALL_DIR, 'latest.txt'),'r') as f:
             #   output = f.read()
-        except:
+        except Exception:
             if options.verbose:
                 print "Error connecting to github to check version"
             else:
@@ -768,7 +767,7 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
     # Docs
     #   http://docs.paramiko.org/en/2.1/
     #   http://jessenoller.com/blog/2009/02/05/ssh-programming-with-paramiko-completely-different     <-- search google, doesn't load from url for some weird reason
-    
+
     if options.host != "localhost":
         # Compatibility with other options
         if options.precompileCode:
@@ -786,17 +785,18 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
         try:
             import paramiko
             ssh = paramiko.SSHClient()
-        except:
+        except Exception:
             raise Exception("Failed to load paramiko. The -R option requires Paramiko. Please make sure that paramiko is installed and configured")
 
-        if options.verbose: print "Using remote host"
+        if options.verbose:
+            print "Using remote host"
 
         # Load remote options
         try:
             import abaverify_remote_options as aro
             user_defined_attributes = [attr for attr in dir(aro) if '__' not in attr]
             remote_opts = {attr: getattr(aro, attr) for attr in user_defined_attributes}
-        except:
+        except Exception:
             # Create dictionary to populate
             remote_opts = dict()
 
@@ -815,7 +815,6 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
             remote_opts['files_to_copy_to_local'] = list()
         if 'environment_file_name' not in remote_opts:
             remote_opts['environment_file_name'] = 'abaqus_v6_remote.env'
-        
 
         # Check for optional path to a run directory
         match = re.search(r'^([A-Za-z0-9\-\.]+)@([A-Za-z0-9\-\.]+):?([0-9]+)?(.*)$', options.host)
@@ -863,7 +862,8 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
                 ssh.close()
                 raise Exception("Unknown error on remote when searching for run directory.")
         stdin, stdout, stderr = ssh.exec_command("rm -rf " + runDir + "/*")
-        if options.verbose: print "Run directory cleaned"
+        if options.verbose:
+            print "Run directory cleaned"
 
         # Transfer files to the run directory
         try:
@@ -875,31 +875,38 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
             pattern = re.compile(remote_opts['source_file_regexp'])
             sourceFiles = [os.path.join(os.path.dirname(options.relPathToUserSub), f) for f in os.listdir(source_file_dir) if pattern.match(f)]
             for sourceFile in sourceFiles:
-                if options.verbose: print "Copying: " + os.path.abspath(sourceFile)
+                if options.verbose:
+                    print "Copying: " + os.path.abspath(sourceFile)
                 ftp.put(sourceFile, os.path.basename(sourceFile))
-                if options.verbose: print "... file copied."
+                if options.verbose:
+                    print "... file copied."
 
             # Make sure there's a symbolic link on the remote so that abaqus doesn't complain about .f and .for
             subroutine_file_name = os.path.basename(options.relPathToUserSub)
-            if options.verbose: print "Creating a symbolic link to the source file"
+            if options.verbose:
+                print "Creating a symbolic link to the source file"
             ssh.exec_command('cd ' + options.remote_run_directory + '; ' + 'ln -s ' + subroutine_file_name + '.for ' + subroutine_file_name + '.f')
-            if options.verbose: print "... symbolic link created."
+            if options.verbose:
+                print "... symbolic link created."
 
             # Environment file (expects naming convention: abaqus_v6_remote.env)
             env_file_name = options.remote['environment_file_name']
             if os.path.isfile(os.path.join(os.getcwd(), env_file_name)):
-                if options.verbose: print "Copying: " + os.path.abspath(env_file_name)
+                if options.verbose:
+                    print "Copying: " + os.path.abspath(env_file_name)
                 ftp.put(env_file_name, 'abaqus_v6.env')
 
             # abaverify_remote_options
             if 'local_files_to_copy_to_remote' in options.remote:
                 for f in options.remote['local_files_to_copy_to_remote']:
-                    if options.verbose: print "Copying: " + os.path.abspath(f)
+                    if options.verbose:
+                        print "Copying: " + os.path.abspath(f)
                     ftp.put(f, os.path.basename(f))
 
             # abaverify processresults.py
             pathForProcessResultsPy = os.path.join(ABAVERIFY_INSTALL_DIR, 'processresults.py')
-            if options.verbose: print "Copying: " + pathForProcessResultsPy
+            if options.verbose:
+                print "Copying: " + pathForProcessResultsPy
             ftp.put(pathForProcessResultsPy, 'processresults.py')
 
         finally:
@@ -912,8 +919,7 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
         for f in os.listdir(testOutputPath):
             os.remove(os.path.join(os.getcwd(), 'testOutput', f))
 
-
-    else: # Run on local host
+    else:  # Run on local host
 
         # Remove rpy files
         testPath = os.getcwd()
@@ -972,7 +978,7 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
                         testName = arg.split('.')[1]
                         if 'test' in testName:
                             calledMethods.append(testName)
-                
+
                 # Now we have a list of the test methods that will be called
                 # print calledMethods
 
@@ -984,7 +990,6 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
                 if len(testsToBeOverwritten) > 0:
                     raise Exception("Cannot overwrite the following tests {0}".format(str(testsToBeOverwritten)))
 
-
             # Try to pre-compile the code
             if not options.useExistingBinaries:
                 wd = os.getcwd()
@@ -995,7 +1000,7 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
                             compileCodeFunc()
                         else:
                             _compileCode(os.path.basename(options.relPathToUserSub))
-                    except:
+                    except Exception:
                         print "ERROR: abaqus make failed.", sys.exc_info()[0]
                         raise Exception("Error compiling with abaqus make. Look for 'compile.log' in the testOutput directory. Or try running 'abaqus make library=CompDam_DGD' from the /for directory to debug.")
                         os.chdir(wd)
@@ -1016,7 +1021,7 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
                                 print "Found usub_lib_dir"
                                 pathInEnvFile = re.findall('= "(.*)"$', line).pop()
                                 if pathInEnvFile:
-                                    if pathInEnvFile == '/'.join(os.path.abspath(os.path.join(os.pardir, 'build')).split('\\')): # Note that this nonsense is because abaqus wants '/' as os.sep even on windows
+                                    if pathInEnvFile == '/'.join(os.path.abspath(os.path.join(os.pardir, 'build')).split('\\')):  # Note that this nonsense is because abaqus wants '/' as os.sep even on windows
                                         foundusub = True
                                         break
                                     else:
@@ -1036,7 +1041,6 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
                 shutil.copyfile(os.path.join(os.getcwd(), 'abaqus_v6.env'), os.path.join(os.getcwd(), 'testOutput', 'abaqus_v6.env'))
             else:
                 raise Exception("Missing environment file. Please configure a local abaqus environment file. See getting started in readme.")
-
 
     try:
         unittest.main(verbosity=2)
