@@ -152,17 +152,16 @@ def _historyOutputNameHelperNode(prefixString, identifier, steps):
             raise Exception("_historyOutputNameHelperNode: Must specify position if analysis has multiple steps")
         else:
             step = steps[0]
-        for historyRegions in odb.steps[step].historyRegions.keys():
-            regionLabels = [x for x in odb.steps[step].historyRegions.keys() if i in odb.steps[step].historyRegions[x].historyOutputs]
-            if len(regionLabels) == 1:
-                labelSplit = regionLabels[0].split(' ')
+        for historyRegion in odb.steps[step].historyRegions.keys():
+            if i in odb.steps[step].historyRegions[historyRegion].historyOutputs.keys():
+                regionLabels = historyRegion
+                labelSplit = historyRegion.split(' ')
+                debug(labelSplit)
                 if labelSplit[0] == 'Node' and len(labelSplit) == 2:
                     nodeNumber = labelSplit[1].split('.')[1]
                     return prefixString + i + " at Node " + nodeNumber + " in NSET " + str(identifier["nset"])
                 else:
                     raise Exception("Must specify a position for " + i)
-            else:
-                raise Exception("Found multiple candidate positions. Must specify a position for " + i)
     else:
         raise ValueError("Missing nset definition in RF identifier")
 
