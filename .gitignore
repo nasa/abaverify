@@ -32,6 +32,7 @@
 *.stt
 
 # Abaqus cae files
+*.env
 *.cae
 *.jnl
 *.rec
@@ -40,3 +41,9 @@
 
 # testOutput
 /tests/tests/testOutput/
+
+# Default archive folder
+/tests/tests/autoTestArchive
+
+# test build
+/tests/build/

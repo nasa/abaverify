@@ -1,16 +1,22 @@
 """
-Opens an abaqus odb and gets requested results
+Opens an abaqus odb and gets requested results.
 
-Arguments:
- 1. jobName: name of the abaqus job (code expects an odb and a results text file with this name
-     in the working dir)
+Arguments
+---------
+    jobName: 
+        name of the abaqus job (code expects an odb and a results text file with this name
+        in the working dir)
 
-Sample usage:
+Example
+-------
 $ abaqus cae noGUI=model_runner.py -- jobName
 
-Output:
+Returns
+-------
 This code writes a file jobName_results.py with the reference value and the results collected from the job
 
+Notes
+-----
 Test types:
 1. max, min:
     Records the maximum or minimum value of the specified identifier. Assumes that only one identifier is specified.
@@ -24,8 +30,10 @@ Test types:
     as [min, max] where only values in x withing the bounds of the window are used in searching for the inflection
     point. The reference value and tolerance are specified as pairs corresponding to the x and y values [x, y].
     Numerical derivatives are calculated to find the inflection point. A Butterworth filter is used to smooth the data.
-    It is possible that this test could produce errorneous results if the data is too noisy for the filter settings.
+    It is possible that this test could produce erroneous results if the data is too noisy for the filter settings.
 4. disp_at_zero_y:
+    Records the displacement when the y-value reaches zero. This is useful for finding the maximum displacement in cohesive
+    laws.
 5. log_stress_at_failure_init:
     Writes specified stresses (stressComponents) when first failure index in failureIndices indicates failure (>= 1.0).
     This test assumes that the input deck terminates the analysis shortly after failure is reached by using the *Filter card.
@@ -33,25 +41,28 @@ Test types:
     additionalIdenitifiersToStore can be used to record additional outputs at the increment where failure occurs
     (e.g., alpha). Stress in stressComponents and other data in additionalIdenitifiersToStore are written to a log
     file that is named using the test base name.
+6. slope
+    Finds the slope of an x-y data curve.
+7. finalValue
+    Last output value.
+
 """
 
 
 from abaqus import *
-import abaqusConstants
 from abaqusConstants import *
 from caeModules import *
-import job
 import os
 import inspect
 import sys
 import re
-import shutil
 import numpy as np
 from operator import itemgetter
 
 # This is a crude hack, but its working
 pathForThisFile = os.path.dirname(os.path.abspath(inspect.getfile(inspect.currentframe())))
 sys.path.insert(0, pathForThisFile)
+
 
 # Throw-away debugger
 def debug(obj):
@@ -66,9 +77,9 @@ def interpolate(x, xp, fp):
     if np.all(np.diff(xp) > 0):
         return np.interp(x, xp, fp)
     else:
-        if all([i<0 for i in xp]):
+        if all([i < 0 for i in xp]):
             xpos = np.absolute(xp)
-            return np.interp(-1*x, xpos, fp)
+            return np.interp(-1 * x, xpos, fp)
         else:
             raise Exception("Functionality to interpolate datasets that traverse 0 or are unsorted is not implemented")
 
@@ -104,14 +115,14 @@ def listOfHistoryOutputSymbols():
 
 def parseJobName(name):
     """
-    Parses job name of paramtric tests
+    Parses job name of parametric tests
     """
 
     s = name.split("_")
 
     output = dict()
 
-    # Find the index of the first integer (value of paramter)
+    # Find the index of the first integer (value of parameter)
     idxFirstInt = 0
     while True:
         try:
@@ -121,11 +132,11 @@ def parseJobName(name):
             idxFirstInt += 1
 
     # Everything before the first integer is the basename
-    output["baseName"] = "_".join(s[0:idxFirstInt-1])
+    output["baseName"] = "_".join(s[0:idxFirstInt - 1])
 
-    # Assume everything after the basename is paramters and values
-    for n in range(idxFirstInt-1, len(s), 2):
-        output[s[n]] = s[n+1]
+    # Assume everything after the basename is parameters and values
+    for n in range(idxFirstInt - 1, len(s), 2):
+        output[s[n]] = s[n + 1]
 
     return output
 
@@ -141,17 +152,16 @@ def _historyOutputNameHelperNode(prefixString, identifier, steps):
             raise Exception("_historyOutputNameHelperNode: Must specify position if analysis has multiple steps")
         else:
             step = steps[0]
-        for historyRegions in odb.steps[step].historyRegions.keys():
-            regionLabels = [x for x in odb.steps[step].historyRegions.keys() if odb.steps[step].historyRegions[x].historyOutputs.has_key(i)]
-            if len(regionLabels) == 1:
-                labelSplit = regionLabels[0].split(' ')
+        for historyRegion in odb.steps[step].historyRegions.keys():
+            if i in odb.steps[step].historyRegions[historyRegion].historyOutputs.keys():
+                regionLabels = historyRegion
+                labelSplit = historyRegion.split(' ')
+                debug(labelSplit)
                 if labelSplit[0] == 'Node' and len(labelSplit) == 2:
                     nodeNumber = labelSplit[1].split('.')[1]
                     return prefixString + i + " at Node " + nodeNumber + " in NSET " + str(identifier["nset"])
                 else:
                     raise Exception("Must specify a position for " + i)
-            else:
-                raise Exception("Found multiple candidate positions. Must specify a position for " + i)
     else:
         raise ValueError("Missing nset definition in RF identifier")
 
@@ -205,14 +215,14 @@ def historyOutputNameFromIdentifier(identifier, steps=None):
     """
 
     # Handle case of a list of identifiers
-    if type(identifier) == type(list()):
+    if isinstance(identifier, list):
         out = list()
         for i in identifier:
             out.append(historyOutputNameFromIdentifier(identifier=i, steps=steps))
         return tuple(out)
 
     # Case when identifier is a dictionary
-    elif type(identifier) == type(dict()):
+    elif isinstance(identifier, dict):
         if "symbol" in identifier:
             i = str(identifier["symbol"])
 
@@ -247,7 +257,7 @@ def historyOutputNameFromIdentifier(identifier, steps=None):
             raise ValueError("Identifier missing symbol definition")
 
     # Case when the identifer is specified directly
-    elif type(identifier) == type(str()) or type(identifier) == type(unicode()):
+    elif isinstance(identifier, (str, unicode)):
         return str(identifier)
     else:
         raise ValueError("Expecting that the argument is a list, dict, or str. Found " + str(type(identifier)))
@@ -269,51 +279,51 @@ def write_results(results_to_write, fileName, depth=0):
     else:
         f = open(fileName, 'a')
 
-    if type(results_to_write) == type(dict()):
+    if isinstance(results_to_write, dict):
 
-        f.write('\t'*depth + '{\n')
+        f.write('\t' * depth + '{\n')
 
         for r in results_to_write:
 
-            f.write('\t'*depth + '"' + r + '": ')
+            f.write('\t' * depth + '"' + r + '": ')
 
-            if (type(results_to_write[r]) == type(dict()) or type(results_to_write[r]) == type(list())):
+            if isinstance(results_to_write[r], (dict, list)):
                 f.write('\n')
                 f.close()
                 write_results(results_to_write[r], fileName, depth + 1)
                 f = open(fileName, 'a')
 
-            elif type(results_to_write[r]) == type(str()):
+            elif isinstance(results_to_write[r], str):
                 f.write('"' + str(results_to_write[r]) + '",\n')
             else:
                 f.write(str(results_to_write[r]) + ',\n')
 
         if depth == 0:
-            f.write('\t'*depth + '}\n')
+            f.write('\t' * depth + '}\n')
         else:
-            f.write('\t'*depth + '},\n')
+            f.write('\t' * depth + '}, \n')
 
-    elif type(results_to_write) == type(list()):
+    elif isinstance(results_to_write, list):
 
-        f.write('\t'*depth + '[\n')
+        f.write('\t' * depth + '[\n')
 
         for r in results_to_write:
 
-            if (type(r) == type(dict()) or type(r) == type(list())):
+            if isinstance(r, (dict, list)):
                 f.close()
                 write_results(r, fileName, depth + 1)
                 f = open(fileName, 'a')
 
-            elif type(r) == type(str()):
-                f.write('\t'*depth + '"' + str(r) + '",\n')
+            elif isinstance(r, str):
+                f.write('\t' * depth + '"' + str(r) + '", \n')
 
             else:
-                f.write('\t'*depth + str(r) + ',\n')
+                f.write('\t' * depth + str(r) + ', \n')
 
         if depth == 0:
-            f.write('\t'*depth + ']\n')
+            f.write('\t' * depth + ']\n')
         else:
-            f.write('\t'*depth + '],\n')
+            f.write('\t' * depth + '],\n')
 
 
 debug(os.getcwd())
@@ -325,7 +335,8 @@ jobName = sys.argv[-1]
 para = __import__(jobName + '_expected').parameters
 
 # Change working directory to testOutput and put a copy of the input file in testOutput
-os.chdir(os.path.join(os.getcwd(), 'testOutput'))
+if jobName + '.odb' not in os.listdir(os.getcwd()):
+    os.chdir(os.path.join(os.getcwd(), 'testOutput'))
 
 # Load ODB
 odb = session.openOdb(name=os.path.join(os.getcwd(), jobName + '.odb'), readOnly=False)
@@ -371,12 +382,8 @@ for r in para["results"]:
     # Max, min
     if r["type"] in ("max", "min"):
 
-        # This trys to automatically determine the appropriate position specifier
+        # This tries to automatically determine the appropriate position specifier
         varName = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
-
-        f = open('temp.txt', 'a')
-        f.write(varName)
-        f.close()
 
         # Get the history data
         n = str(r["identifier"]["symbol"]) + '_' + steps[0] + '_' + str(r["type"])
@@ -391,7 +398,6 @@ for r in para["results"]:
             r["computedValue"] = min([pt[1] for pt in xyDataObj])
         testResults.append(r)
 
-
     # Enforce continuity
     elif r["type"] == "continuous":
 
@@ -402,9 +408,8 @@ for r in para["results"]:
         xyDataObj = session.XYDataFromHistory(name='XYData-1', odb=odb, outputVariableName=varName, steps=steps)
 
         # Get the maximum change in the specified value
-        r["computedValue"] = max([max(r["referenceValue"], abs(xyDataObj[x][1] - xyDataObj[x-1][1])) for x in range(2,len(xyDataObj))])
+        r["computedValue"] = max([max(r["referenceValue"], abs(xyDataObj[x][1] - xyDataObj[x - 1][1])) for x in range(2, len(xyDataObj))])
         testResults.append(r)
-
 
     elif r["type"] == "xy_infl_pt":
         varNames = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
@@ -422,19 +427,20 @@ for r in para["results"]:
 
         # Locals
         xyData = xy
-        windowMin=r["window"][0]
-        windowMax=r["window"][1]
+        windowMin = r["window"][0]
+        windowMax = r["window"][1]
 
         # Select window
-        windowed = [x for x in xyData if x[0] > windowMin and x[0] < windowMax]
-        if len(windowed) == 0: raise Exception("No points found in specified window")
-        if min([abs(windowed[i][0]-windowed[i-1][0]) for i in range(1, len(windowed))]) == 0:
+        windowed = [xi for xi in xyData if xi[0] > windowMin and xi[0] < windowMax]
+        if len(windowed) == 0:
+            raise Exception("No points found in specified window")
+        if min([abs(windowed[i][0] - windowed[i - 1][0]) for i in range(1, len(windowed))]) == 0:
             raise "ERROR"
         session.XYData(data=windowed, name="windowed")
         ldWindowed = session.xyDataObjects['windowed']
         odb.userData.XYData('windowed', ldWindowed)
 
-        # Calcuate the derivative using a moving window
+        # Calculate the derivative using a moving window
         xy = differentiate(session.xyDataObjects['windowed'])
         xy = resample(data=xy, numPts=10000)
 
@@ -459,14 +465,13 @@ for r in para["results"]:
         odb.userData.XYData('dslope', dslope)
         x, y = zip(*dslope)
         y = np.absolute(y)
-        dslope = zip(x,y)
+        dslope = zip(x, y)
         xMax, yMax = max(dslope, key=itemgetter(1))
 
         # Store the x, y pair at the inflection point
         x, y = zip(*session.xyDataObjects['windowed'])
         r["computedValue"] = (xMax, interpolate(xMax, x, y))
         testResults.append(r)
-
 
     elif r["type"] == "disp_at_zero_y":
         varNames = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
@@ -481,11 +486,11 @@ for r in para["results"]:
             windowMin = r["window"][0]
             windowMax = r["window"][1]
         else:
-            windowMin = r['referenceValue'] - 2*r['tolerance']
-            windowMax = r['referenceValue'] + 2*r['tolerance']
+            windowMin = r['referenceValue'] - 2 * r['tolerance']
+            windowMax = r['referenceValue'] + 2 * r['tolerance']
 
         # Use subset of full traction-separation response
-        windowed = [x for x in xy if x[0] > windowMin and x[0] < windowMax]
+        windowed = [xi for xi in xy if xi[0] > windowMin and xi[0] < windowMax]
 
         # Tolerance to zero
         if "zeroTol" not in r:
@@ -505,10 +510,9 @@ for r in para["results"]:
         r["computedValue"] = disp_crit
         testResults.append(r)
 
-
     elif r["type"] == "log_stress_at_failure_init":
 
-        # Load history data for failure indices and store xy object to list 'failed' if the index is failed at last increment
+        # Load history data for failure indices and store xy object to list 'failed' if the index is failed
         failed = list()
         varNames = historyOutputNameFromIdentifier(identifier=r["failureIndices"], steps=steps)
         for i in range(0, len(varNames)):
@@ -516,8 +520,10 @@ for r in para["results"]:
             xy = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varNames[i], steps=steps)
             xy = session.xyDataObjects[n]
             odb.userData.XYData(n, xy)
-            if xy[-1][1] >= 1.0:
-                failed.append(xy)
+            for y in reversed(xy):
+                if y[1] >= 1.0:
+                    failed.append(xy)
+                    break
 
         # Make sure at least one failure index has reached 1.0
         if len(failed) <= 0:
@@ -526,7 +532,7 @@ for r in para["results"]:
         # Find the increment number where failure initiated
         i = len(failed[0])
         while True:
-            i = i - 1
+            i -= 1
             if len(failed) > 1:
                 for fi in failed:
                     if fi[i][1] < 1.0:
@@ -535,10 +541,8 @@ for r in para["results"]:
                     raise NotImplementedError("Multiple failure modes occurred at the same increment")
                 continue
             else:
-                if failed[0][i][1] >= 1.0:
-                    continue
-                elif failed[0][i][1] < 1.0:
-                    inc = i + 1
+                if failed[0][i][1] >= 1.0 and failed[0][i - 1][1] < 1.0:
+                    inc = i
                     break
 
         # Get values of stress at final failure
@@ -561,7 +565,6 @@ for r in para["results"]:
             odb.userData.XYData(n, xy)
             additionalData[n] = xy[inc][1]
 
-
         # Get job name
         jnparsed = parseJobName(jobName)
 
@@ -579,7 +582,6 @@ for r in para["results"]:
         with open(logFileName, "a") as f:
             f.write(dataToWrite)
 
-
     elif r["type"] == "slope":
         varNames = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
 
@@ -596,19 +598,20 @@ for r in para["results"]:
 
         # Locals
         xyData = xy
-        windowMin=r["window"][0]
-        windowMax=r["window"][1]
+        windowMin = r["window"][0]
+        windowMax = r["window"][1]
 
         # Select window
-        windowed = [x for x in xyData if x[0] > windowMin and x[0] < windowMax]
-        if len(windowed) == 0: raise Exception("No points found in specified window")
-        if min([abs(windowed[i][0]-windowed[i-1][0]) for i in range(1, len(windowed))]) == 0:
+        windowed = [xi for xi in xyData if xi[0] > windowMin and xi[0] < windowMax]
+        if len(windowed) == 0:
+            raise Exception("No points found in specified window")
+        if min([abs(windowed[i][0] - windowed[i - 1][0]) for i in range(1, len(windowed))]) == 0:
             raise "ERROR"
         session.XYData(data=windowed, name="windowed")
         ldWindowed = session.xyDataObjects['windowed']
         odb.userData.XYData('windowed', ldWindowed)
 
-        # Calcuate the derivative
+        # Calculate the derivative
         xy = differentiate(session.xyDataObjects['windowed'])
         tmpName = xy.name
         session.xyDataObjects.changeKey(tmpName, 'slope_xy_diff')
@@ -619,6 +622,19 @@ for r in para["results"]:
         r["computedValue"] = np.mean(y)
         testResults.append(r)
 
+    elif r["type"] == "finalValue":
+        # This trys to automatically determine the appropriate position specifier
+        varName = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
+
+        # Get the history data
+        n = str(r["identifier"]["symbol"]) + '_' + steps[0] + '_' + str(r["type"])
+        xyDataObj = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varName, steps=steps)
+        xy = session.xyDataObjects[n]
+
+        # Get the value calculated in the analysis (last frame must equal to 1, which is total step time)
+        r["computedValue"] = xyDataObj[-1][1]
+
+        testResults.append(r)
 
     else:
         raise NotImplementedError("test_case result data not recognized: " + str(r))
@@ -632,7 +648,7 @@ fileName = os.path.join(os.getcwd(), jobName + '_results.py')
 # Remove the old results file if it exists
 try:
     os.remove(fileName)
-except:
+except Exception:
     pass
 
 write_results(testResults, fileName)

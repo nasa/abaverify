@@ -13,7 +13,7 @@
        ! Write only -
         stressNew, stateNew, enerInternNew, enerInelasNew )
 
-      ! Load modulues
+      ! Load modules
       use materialProperties
 
 #ifdef umat

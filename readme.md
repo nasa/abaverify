@@ -10,9 +10,9 @@ For any questions, please contact the developers:
 - Frank Leone   | [frank.a.leone@nasa.gov](mailto:frank.a.leone@nasa.gov)     | (W) 757-864-3050
 
 ## Getting-Started
-This package assumes that you have `python 2.7` and `git` installed. This packaged is designed for Abaqus 2016 and it has been used successfully with v6.14; it may or may not work with older versions. It also assumes that you have an Abaqus user subroutine in a git repository with a minimum directory structure as shown here:
+This package assumes that you have `python 2.x` and `git` installed. This packaged is designed for Abaqus 2016 and it has been used successfully with v6.14; it may or may not work with older versions. It also assumes that you have an Abaqus user subroutine in a git repository with a minimum directory structure as shown here:
 ```
-.
+repo_dir/
     .git/
     for/
         usub.for
@@ -29,7 +29,18 @@ This package assumes that you have `python 2.7` and `git` installed. This packag
 The user subroutine is stored in the `for/` directory and the verification tests are stored in the `<your_userSubroutine_repo_dir>/tests/` directory.
 
 ### Install `abaverify`
-To install `abaverify`, simply clone it to your subroutine's `tests/` directory.
+Abaverify can be installed using the python utility `pip` (8.x+). The following sections provide a short summary of how to use `pip` to install `abaverify`. Clone `abaverify` into a convenient directory:
+```
+$  git clone https://developer.nasa.gov/struct-mech/abaverify.git
+```
+Then install using the `-e` option:
+```
+$  pip install -e path/to/abaverifyDir
+```
+
+That's it.
+
+If install fails with errors indicating an issue with `paramiko` or `cryptography`, see the [`paramiko` installation guide](http://www.paramiko.org/installing.html) for troubleshooting.
 
 The remainder of this section describes how to build your own tests using `abaverify` (e.g., what goes inside the `test_model1.inp`, `test_model1_expected.py`, and `test_runner.py`) files. For a working example, checkout the sample verification test in the `abaverify/tests/tests/` directory. You can run the sample test with the command `python test_runner.py` from the `abaverify/tests/tests/` directory. Note, the default environment file (`abaverify/tests/tests`) is formatted for windows; linux users will need to modify the default environment file to the linux format.
 
@@ -60,7 +71,7 @@ parameters = {
         ]
 }   
 ```
-The value found in the `odb` must match the reference value for the test to pass. In the case above, the test is simply to say that `SDV_CDM_d2` is always zero, since the range of `SDV_CDM_d2` happens to be between 0 and 1. Any history output quantity can be interrogated using one of the following criteria defined in the `type` field: `max`, `min`, `continuous`, `xy_infl_pt`, `disp_at_zero_y`, `log_stress_at_failure_init`, or `slope`. Here is a more complicated example:
+The value found in the `odb` must match the reference value for the test to pass. In the case above, the test is simply to say that `SDV_CDM_d2` is always zero, since the range of `SDV_CDM_d2` happens to be between 0 and 1. Any history output quantity can be interrogated using one of the following criteria defined in the `type` field: `max`, `min`, `continuous`, `xy_infl_pt`, `disp_at_zero_y`, `log_stress_at_failure_init`, `slope`, or `finalValue`. Here's a more complicated example:
 ```
 parameters = {
     "results":
@@ -92,11 +103,14 @@ The results array can contain as many result objects as needed to verify that th
 
 ### Create a `test_runner.py` file
 The file `sample_usage.py` gives an example of how you call your newly created tests. By convention, this file is named as `test_runner.py`. This file must include:
+
 1. `import abaverify`.
-2. classes that inherit `av.TestCase` and define functions beginning with `test` following the usage of `unittest`. See the `sample_usage.py` for an example.
+2. classes that inherit `abaverify.TestCase` and define functions beginning with `test` following the usage of `unittest`. See the `sample_usage.py` for an example.
 3. call to `runTests()` which takes one argument: the relative path to your user subroutine (omit the `.f` or `.for` ending, the code automatically appends it).
 
-## Running your tests
+Functionality in `unittest` can be accessed via `abaverify.unittest`. One example of the use case for this is that `unittest` decorators can be applied to functions and classes in the `test_runner.py` file.
+
+### Running your tests
 Before running tests, make sure you place an Abaqus environment file in your project's `tests/` directory. At a minimum, the environment file should include the options for compiling your subroutine. If you do not include your environment file, `abaverify` will give an error.
 
 You can run your tests with the syntax defined by `unittest`. To run all tests, execute the following from the `tests` directory of your project:
@@ -105,27 +119,47 @@ tests $  python test_runner.py
 ```
 All of the tests that have been implemented will be run. The last few lines of output from these commands indicate the number of tests run and `OK` if they are all successful.
 
-To run a single test, add the class and test name. For example, for the input deck `test_CPS4R_tension.inp`, type:
+To run a single test, add the class and test name. For example for the input deck `test_CPS4R_tension.inp` type:
 ```
 tests $  python test_runner.py SingleElementTests.test_CPS4R_tension
 ```
 
+## Command Line Options
 Various command line options can be used as described below.
-
-The option `-i` or equivalently `--interactive` can be specified to print the Abaqus log data to the terminal. For example:
+- `-A` or `--abaqusCmd` can be used to override the abaqus command to specify a particular version of abaqus. By default, the abaqus command is `abaqus`. Specify a string after the option to use a different version of abaqus. For example:
 ```
-tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 --interactive
+tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 -A abq6123
 ```
-
-The option `-t` or equivalently `--time` can be specified to print the run times for the compiler, packager, and solver to the terminal. For example:
+- `-c` or `--preCompileCode` can be specified to use `abaqus make` to compile the code into a binary before running one or more tests. A function that compiles the code must be provided to `abaverify` as an argument to the `runTests` function call in `test_runner.py`. The `usub_lib` option must be defined in the environment file.
+- `-C` or `--cpus` can be used to run abaqus jobs on more than one cpu. By default, abaqus jobs are run on one cpu. To specify more than one cpu, use a command like:
+```
+tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 -C 4
+```
+- `-d` or `--double` can be specified to run explicit jobs with double precision.
+- `-e` or `--useExistingBinaries` can be specified to reuse the most recent compiled version of the code.
+- `-i` or `--interactive` can be specified to print the Abaqus log data to the terminal.
+- `-r` or `--useExistingResults` can be specified to reuse the most recent test results. The net effect is that only the post-processing portion of the code is run, so you don't have to wait for the model to run just to debug a `_expected.py` file or `processresults.py`.
+- `-R` or `--remoteHost` can be specified to run the tests on a remote host, where the host information is passed as `user@server.com[:port][/path/to/run/dir]`. The default run directory is `<login_dir>/abaverify_temp/`. Looks for a file in the `tests/` directory called `abaverify_remote_options.py`, which can be used to set options for working with the remote server. An example of this file is available `abaverify/tests/tests/abaverify_remote_options.p`. Usage example:
+```
+tests $  python test_runner.py -R username@server.sample.com
+```
+- `-s` or equivalently `--specifyPathToSub` can be used to override the relative path to the user subroutine specified in the the call `abaverify.runTests()` in your `test_runner.py` file.
+- `-t` or `--time` can be specified to print the run times for the compiler, packager, and solver to the terminal. For example:
 ```
 tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 --timer
 ```
+- `-V` or `--verbose` can be specified to print the Abaqus log data to the terminal.
 
-The option `-c` or equivalently `--preCompileCode` can be specified to use `abaqus make` to compile the code into a binary before running one or more tests. A function that compiles the code must be provided to `abaverify` as an argument to the `runTests` function call in `test_runner.py`. The `usub_lib` option must be defined in the environment file.
+## Results `type`
+A variety of different types of results can be extracted from the odbs and compared with reference values. A list of each support type and brief explanation are provided below:
+- `max`: finds the maximum value of an xy data set
+- `min`: finds the minimum value of an xy data set
+- `continuous`: finds the maximum delta between two sequential increments an xy data set
+- `xy_infl_pt`: finds an inflection point in xy data set
+- `disp_at_zero_y`: finds the displacement (implied as x value) where the y value is zero in an xy data set
+- `log_stress_at_failure_init`: finds stress at failure (intended for checking failure criteria)
+- `slope`: finds the slope of an xy data set
+- `finalValue`: finds the y value at the last increment in the xy data set
 
-The option `-e` or equivalently `--useExistingBinaries` can be specified to reuse the most recent compiled version of the code.
-
-The option `-r` or equivalently `--useExistingResults` can be specified to reuse the most recent test results. The net effect is that only the post-processing portion of the code is run, so you don't have to wait for the model to run just to debug a `_expected.py` file or `processresults.py`.
-
-The option `-s` or equivalently `--specifyPathToSub` can be used to override the relative path to the user subroutine specified in the the call `av.runTests()` in your `test_runner.py` file.
+## Automatic testing
+Abaverify has the capability to run a series of tests, generate a report, and plot run times against historical run times. See `automatic.py` and `automatic_testing_script.py` for details.

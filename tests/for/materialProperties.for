@@ -87,8 +87,6 @@
           properties%nu31 = properties%nu13 * (properties%E3/properties%E1)
           properties%nu32 = properties%nu23 * (properties%E3/properties%E2)
 
-          ! TODO Add checks on elastic constants
-
 
           return
         end subroutine materialProperties_load
