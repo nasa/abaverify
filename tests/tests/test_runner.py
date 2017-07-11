@@ -13,7 +13,7 @@ class ParametricTests(av.TestCase):
     baseName = "test_CPS4R_parametric"
 
     # Range of parameters to test; multiple can be specified and all combinations are tested
-    parameters = {'mass_factor':  [1e3, 1e4]}
+    parameters = {'mass_factor': [1e3, 1e4]}
 
 
 class SingleElementTests(av.TestCase):
