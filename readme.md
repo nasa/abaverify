@@ -31,7 +31,7 @@ The user subroutine is stored in the `for/` directory and the verification tests
 ### Install `abaverify`
 Abaverify can be installed using the python utility `pip` (8.x+). The following sections provide a short summary of how to use `pip` to install `abaverify`. Clone `abaverify` into a convenient directory:
 ```
-$  git clone https://developer.nasa.gov/struct-mech/abaverify.git
+$  git clone https://github.com/nasa/abaverify.git
 ```
 Then install using the `-e` option:
 ```
