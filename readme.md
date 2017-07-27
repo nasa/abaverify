@@ -139,14 +139,14 @@ tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 -C 4
 - `-e` or `--useExistingBinaries` can be specified to reuse the most recent compiled version of the code.
 - `-i` or `--interactive` can be specified to print the Abaqus log data to the terminal.
 - `-r` or `--useExistingResults` can be specified to reuse the most recent test results. The net effect is that only the post-processing portion of the code is run, so you don't have to wait for the model to run just to debug a `_expected.py` file or `processresults.py`.
-- `-R` or `--remoteHost` can be specified to run the tests on a remote host, where the host information is passed as `user@server.com[:port][/path/to/run/dir]`. The default run directory is `<login_dir>/abaverify_temp/`. Looks for a file in the `tests/` directory called `abaverify_remote_options.py`, which can be used to set options for working with the remote server. An example of this file is available `abaverify/tests/tests/abaverify_remote_options.p`. Usage example:
+- `-R` or `--remoteHost` can be specified to run the tests on a remote host, where the host information is passed as `user@server.com[:port][/path/to/run/dir]`. The default run directory is `<login_dir>/abaverify_temp/`. Looks for a file in the `tests/` directory called `abaverify_remote_options.py`, which can be used to set options for working with the remote server. An example of this file is available `abaverify/tests/tests/abaverify_remote_options.py`. Usage example:
 ```
 tests $  python test_runner.py -R username@server.sample.com
 ```
 - `-s` or equivalently `--specifyPathToSub` can be used to override the relative path to the user subroutine specified in the the call `abaverify.runTests()` in your `test_runner.py` file.
 - `-t` or `--time` can be specified to print the run times for the compiler, packager, and solver to the terminal. For example:
 ```
-tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 --timer
+tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 --time
 ```
 - `-V` or `--verbose` can be specified to print the Abaqus log data to the terminal.
 
