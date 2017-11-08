@@ -314,7 +314,7 @@ class TestCase(unittest.TestCase):
                 if not os.path.isfile(os.path.join(os.getcwd(), 'testOutput', jobName + '.odb')):
                     raise Exception("Error: Abaqus odb was not generated. Check the log file in the testOutput directory.")
                 pathForProcessResultsPy = '"' + os.path.join(ABAVERIFY_INSTALL_DIR, 'processresults.py') + '"'
-                _callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName, log=f, timer=timer)
+                _callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName + " " + str(options.doNotSave), log=f, timer=timer)
 
             else:  # Remote host
                 self.callAbaqusOnRemote(cmd=options.abaqusCmd + ' cae noGUI=processresults.py -- -- ' + jobName, log=f, timer=timer)
@@ -688,6 +688,7 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
     parser.add_option("-R", "--remoteHost", action="store", type="string", dest="host", default="localhost", help="Run on remote host; e.g. user@server.com[:port][/path/to/run/dir]. Default run dir is <login_dir>/abaverify_temp/")
     parser.add_option("-V", "--verbose", action="store_true", dest="verbose", default=False, help="Print information for debugging")
     parser.add_option("-d", "--double", action="store_true", dest="double", default=False, help="Run with double precision (double=both)")
+    parser.add_option("-n", "--doNotSaveODB", action="store_true", dest="doNotSave", default=False, help="Does not save x-y data to the ODB")
     (options, args) = parser.parse_args()
 
     # Remove custom args so they do not get sent to unittest

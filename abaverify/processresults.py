@@ -329,7 +329,8 @@ def write_results(results_to_write, fileName, depth=0):
 debug(os.getcwd())
 
 # Arguments
-jobName = sys.argv[-1]
+jobName = sys.argv[-2]
+readOnly = sys.argv[-1] == 'True'
 
 # Load parameters
 para = __import__(jobName + '_expected').parameters
@@ -339,7 +340,7 @@ if jobName + '.odb' not in os.listdir(os.getcwd()):
     os.chdir(os.path.join(os.getcwd(), 'testOutput'))
 
 # Load ODB
-odb = session.openOdb(name=os.path.join(os.getcwd(), jobName + '.odb'), readOnly=False)
+odb = session.openOdb(name=os.path.join(os.getcwd(), jobName + '.odb'), readOnly=readOnly)
 
 # Report errors
 if odb.diagnosticData.numberOfAnalysisErrors > 0:
@@ -640,7 +641,9 @@ for r in para["results"]:
         raise NotImplementedError("test_case result data not recognized: " + str(r))
 
 # Save the odb
-odb.save()
+if not readOnly:
+    debug('Saving xy data')
+    odb.save()
 
 # Write the results to a text file for assertions by test_runner
 fileName = os.path.join(os.getcwd(), jobName + '_results.py')
