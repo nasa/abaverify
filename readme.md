@@ -138,6 +138,7 @@ tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 -C 4
 - `-d` or `--double` can be specified to run explicit jobs with double precision.
 - `-e` or `--useExistingBinaries` can be specified to reuse the most recent compiled version of the code.
 - `-i` or `--interactive` can be specified to print the Abaqus log data to the terminal.
+- `-n` or `--doNotSaveODB` can be used to disable saving of x-y data to the odb. This is sometimes helpful when debugging post processing scripts in conjunction with `-r`
 - `-r` or `--useExistingResults` can be specified to reuse the most recent test results. The net effect is that only the post-processing portion of the code is run, so you don't have to wait for the model to run just to debug a `_expected.py` file or `processresults.py`.
 - `-R` or `--remoteHost` can be specified to run the tests on a remote host, where the host information is passed as `user@server.com[:port][/path/to/run/dir]`. The default run directory is `<login_dir>/abaverify_temp/`. Looks for a file in the `tests/` directory called `abaverify_remote_options.py`, which can be used to set options for working with the remote server. An example of this file is available `abaverify/tests/tests/abaverify_remote_options.py`. Usage example:
 ```
@@ -160,6 +161,7 @@ A variety of different types of results can be extracted from the odbs and compa
 - `log_stress_at_failure_init`: finds stress at failure (intended for checking failure criteria)
 - `slope`: finds the slope of an xy data set
 - `finalValue`: finds the y value at the last increment in the xy data set
+- `x_at_peak_in_xy`: finds the x-value corresponding to the absolute peak in the y-value
 
 ## Automatic testing
 Abaverify has the capability to run a series of tests, generate a report, and plot run times against historical run times. See `automatic.py` and `automatic_testing_script.py` for details.
