@@ -637,6 +637,30 @@ for r in para["results"]:
 
         testResults.append(r)
 
+    elif r["type"] == "x_at_peak_in_xy":
+        varNames = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
+
+        # Get xy data
+        x = session.XYDataFromHistory(name=str(r["identifier"][0]["symbol"]), odb=odb, outputVariableName=varNames[0], steps=steps)
+        y = session.XYDataFromHistory(name=str(r["identifier"][1]["symbol"]), odb=odb, outputVariableName=varNames[1], steps=steps)
+
+        # Combine the x and y data
+        xy = combine(x, y)
+        tmpName = xy.name
+        session.xyDataObjects.changeKey(tmpName, 'ld')
+        xy = session.xyDataObjects['ld']
+        odb.userData.XYData('ld', xy)
+
+        # Get maximum y value then find corresponding x
+        x = [pt[0] for pt in xy]
+        y = [abs(pt[1]) for pt in xy]
+        y_max = max(y)
+        x_at_peak = x[y.index(y_max)]
+
+        # Return
+        r["computedValue"] = x_at_peak
+        testResults.append(r)
+
     else:
         raise NotImplementedError("test_case result data not recognized: " + str(r))
 

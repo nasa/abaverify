@@ -161,6 +161,7 @@ A variety of different types of results can be extracted from the odbs and compa
 - `log_stress_at_failure_init`: finds stress at failure (intended for checking failure criteria)
 - `slope`: finds the slope of an xy data set
 - `finalValue`: finds the y value at the last increment in the xy data set
+- `x_at_peak_in_xy`: finds the x-value corresponding to the absolute peak in the y-value
 
 ## Automatic testing
 Abaverify has the capability to run a series of tests, generate a report, and plot run times against historical run times. See `automatic.py` and `automatic_testing_script.py` for details.
