@@ -726,6 +726,17 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
     path_to_latest_ver_file = os.path.join(ABAVERIFY_INSTALL_DIR, 'latest.txt')
     lastModified = datetime.datetime.fromtimestamp(os.path.getmtime(path_to_latest_ver_file))
     if (datetime.datetime.now() - lastModified).days > 1:
+
+        skip = False
+
+        # Load current version
+        current_version = "v0.0.0"
+        version_file_as_str = open(os.path.join(ABAVERIFY_INSTALL_DIR, "_version.py"), "rt").read()
+        version_re = r"^__version__ = ['\"]([^'\"]*)['\"]"
+        match = re.search(version_re, version_file_as_str, re.M)
+        if match:
+            current_version = match.group(1)
+
         # Update version file
         try:
             import json
@@ -740,24 +751,20 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
             # with open(os.path.join(ABAVERIFY_INSTALL_DIR, 'latest.txt'),'r') as f:
             #   output = f.read()
         except Exception:
+            skip = True  # Skip check due to lack of connectivity
             if options.verbose:
                 print "Error connecting to github to check version"
             else:
                 pass
 
-        # Load current version
-        current_version = "v0.0.0"
-        version_file_as_str = open(os.path.join(ABAVERIFY_INSTALL_DIR, "_version.py"), "rt").read()
-        version_re = r"^__version__ = ['\"]([^'\"]*)['\"]"
-        match = re.search(version_re, version_file_as_str, re.M)
-        if match:
-            current_version = match.group(1)
-
         # Compare versions
-        if _versiontuple(latest_version) > _versiontuple(current_version):
-            print "  NOTICE: Version {0} of abaverify is available, consider upgrading from your current version ({1})".format(latest_version, current_version)
+        if skip:
+            print "connectivity issue; skipping version check"
         else:
-            print "Checked for updates; none found."
+            if _versiontuple(latest_version) > _versiontuple(current_version):
+                print "  NOTICE: Version {0} of abaverify is available, consider upgrading from your current version ({1})".format(latest_version, current_version)
+            else:
+                print "Checked for updates; none found."
 
     # Remote host
     #
