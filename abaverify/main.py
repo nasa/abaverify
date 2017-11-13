@@ -317,7 +317,7 @@ class TestCase(unittest.TestCase):
                 _callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName + " " + str(options.doNotSave), log=f, timer=timer)
 
             else:  # Remote host
-                self.callAbaqusOnRemote(cmd=options.abaqusCmd + ' cae noGUI=processresults.py -- -- ' + jobName, log=f, timer=timer)
+                self.callAbaqusOnRemote(cmd=options.abaqusCmd + ' cae noGUI=processresults.py -- -- ' + jobName + " " + str(options.doNotSave), log=f, timer=timer)
                 try:
                     ftp = options.ssh.open_sftp()
                     ftp.chdir(options.remote_run_directory)
@@ -565,10 +565,10 @@ class ParametricMetaClass(type):
                             if not os.path.isfile(os.path.join(os.getcwd(), 'testOutput', jobName + '.odb')):
                                 raise Exception("Error: Abaqus odb was not generated. Check the log file in the testOutput directory.")
                             pathForProcessResultsPy = '"' + os.path.join(ABAVERIFY_INSTALL_DIR, 'processresults.py') + '"'
-                            _callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName, log=f, timer=timer)
+                            _callAbaqus(cmd=options.abaqusCmd + ' cae noGUI=' + pathForProcessResultsPy + ' -- -- ' + jobName + " " + str(options.doNotSave), log=f, timer=timer)
 
                         else:  # Remote host
-                            _callAbaqusOnRemote(cmd=options.abaqusCmd + ' cae noGUI=processresults.py -- -- ' + jobName, log=f, timer=timer)
+                            _callAbaqusOnRemote(cmd=options.abaqusCmd + ' cae noGUI=processresults.py -- -- ' + jobName + " " + str(options.doNotSave), log=f, timer=timer)
                             try:
                                 ftp = options.ssh.open_sftp()
                                 ftp.chdir(options.remote_run_directory)
