@@ -747,6 +747,9 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
 
     # Check version of script and notify the user if its out of date
     path_to_latest_ver_file = os.path.join(ABAVERIFY_INSTALL_DIR, 'latest.txt')
+    if not os.path.isfile(path_to_latest_ver_file):
+        with open(path_to_latest_ver_file, "w") as h:
+            h.write("0.0.0")
     lastModified = datetime.datetime.fromtimestamp(os.path.getmtime(path_to_latest_ver_file))
     if (datetime.datetime.now() - lastModified).days > 1:
 
@@ -760,7 +763,7 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
         if match:
             current_version = match.group(1)
 
-        # Update version file
+        # Update latest version file
         try:
             import json
             import urllib2
@@ -771,8 +774,6 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
             latest_version = tag[1:]
             with open(path_to_latest_ver_file, "w") as h:
                 h.write(latest_version)
-            # with open(os.path.join(ABAVERIFY_INSTALL_DIR, 'latest.txt'),'r') as f:
-            #   output = f.read()
         except Exception:
             skip = True  # Skip check due to lack of connectivity
             if options.verbose:
