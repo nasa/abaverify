@@ -28,6 +28,13 @@ class SingleElementTests(av.TestCase):
     def test_CPS4R_shear(self):
         self.runTest('test_CPS4R_shear')
 
+    def test_CPS4R_tension_tabular(self):
+        '''
+        Confirm that the tabular query works as expected.
+        This input deck checks both forms of the tabular input (list tolerance
+        and a single tuple tolerance)
+        '''
+        self.runTest('test_CPS4R_tension_tabular')
 
 # That's it for setup. Add as many tests as you want!
 

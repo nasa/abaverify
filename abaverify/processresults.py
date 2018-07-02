@@ -385,7 +385,7 @@ if "ignoreWarnings" in para and not para["ignoreWarnings"]:
 testResults = list()
 
 # Collect results
-for r in para[results_name]:
+for iii, r in enumerate(para[results_name]):
 
     # Get the steps to consider. Default to "Step-1"
     if "step" in r:
@@ -692,9 +692,10 @@ for r in para[results_name]:
         # Combine the x and y data
         xy = combine(x, y)
         tmpName = xy.name
-        session.xyDataObjects.changeKey(tmpName, 'ld')
-        xy = session.xyDataObjects['ld']
-        odb.userData.XYData('ld', xy)
+        xy_data_name = 'ld{}'.format(iii)
+        session.xyDataObjects.changeKey(tmpName, xy_data_name)
+        xy = session.xyDataObjects[xy_data_name]
+        odb.userData.XYData(xy_data_name, xy)
 
         xy_np = np.asarray(xy)
         x = xy_np[:, 0]
