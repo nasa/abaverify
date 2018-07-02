@@ -45,6 +45,8 @@ Test types:
     Finds the slope of an x-y data curve.
 7. finalValue
     Last output value.
+8. tabular
+    Compares the values for a list of tuples specifying x, y points [(x1, y1), (x2, y2)...]
 
 """
 
@@ -326,6 +328,23 @@ def write_results(results_to_write, fileName, depth=0):
             f.write('\t' * depth + '],\n')
 
 
+# keys used in results dict
+type_name = "type"
+compute_value_name = "computedValue"
+reference_value_name = "referenceValue"
+identifier_name = "identifier"
+symbol_name = "symbol"
+results_name = "results"
+results_max = "max"
+results_min = "min"
+results_continous = "continuous"
+results_xy_infl_pt = "xy_infl_pt"
+results_disp_at_zero_y = "disp_at_zero_y"
+results_log_stress_at_failure_init = "log_stress_at_failure_init"
+results_slope = "slope"
+results_final_value = "finalValue"
+results_x_at_peak_in_xy = "x_at_peak_in_xy"
+results_tabular = "tabular"
 debug(os.getcwd())
 
 # Arguments
@@ -345,8 +364,8 @@ odb = session.openOdb(name=os.path.join(os.getcwd(), jobName + '.odb'), readOnly
 # Report errors
 if odb.diagnosticData.numberOfAnalysisErrors > 0:
     # Ignore excessive element distortion errors when generating failure envelopes
-    resultTypes = [r["type"] for r in para["results"]]
-    if "log_stress_at_failure_init" in resultTypes:
+    resultTypes = [r[type_name] for r in para[results_name]]
+    if results_log_stress_at_failure_init in resultTypes:
         for e in odb.diagnosticData.analysisErrors:
             if e.description != 'Excessively distorted elements':
                 raise Exception("\nERROR: Errors occurred during analysis")
@@ -366,7 +385,7 @@ if "ignoreWarnings" in para and not para["ignoreWarnings"]:
 testResults = list()
 
 # Collect results
-for r in para["results"]:
+for iii, r in enumerate(para[results_name]):
 
     # Get the steps to consider. Default to "Step-1"
     if "step" in r:
@@ -381,43 +400,43 @@ for r in para["results"]:
     # Collect data from odb for each type of test
 
     # Max, min
-    if r["type"] in ("max", "min"):
+    if r[type_name] in (results_max, results_min):
 
         # This tries to automatically determine the appropriate position specifier
-        varName = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
+        varName = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
         # Get the history data
-        n = str(r["identifier"]["symbol"]) + '_' + steps[0] + '_' + str(r["type"])
+        n = str(r[identifier_name][symbol_name]) + '_' + steps[0] + '_' + str(r[type_name])
         xyDataObj = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varName, steps=steps)
         xy = session.xyDataObjects[n]
         # odb.userData.XYData(n, xy)
 
         # Get the value calculated in the analysis (last frame must equal to 1, which is total step time)
-        if r["type"] == "max":
-            r["computedValue"] = max([pt[1] for pt in xyDataObj])
+        if r[type_name] == results_max:
+            r[compute_value_name] = max([pt[1] for pt in xyDataObj])
         else:
-            r["computedValue"] = min([pt[1] for pt in xyDataObj])
+            r[compute_value_name] = min([pt[1] for pt in xyDataObj])
         testResults.append(r)
 
     # Enforce continuity
-    elif r["type"] == "continuous":
+    elif r[type_name] == results_continous:
 
         # This trys to automatically determine the appropriate position specifier
-        varName = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
+        varName = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
         # Get the history data
         xyDataObj = session.XYDataFromHistory(name='XYData-1', odb=odb, outputVariableName=varName, steps=steps)
 
         # Get the maximum change in the specified value
-        r["computedValue"] = max([max(r["referenceValue"], abs(xyDataObj[x][1] - xyDataObj[x - 1][1])) for x in range(2, len(xyDataObj))])
+        r[compute_value_name] = max([max(r[reference_value_name], abs(xyDataObj[x][1] - xyDataObj[x - 1][1])) for x in range(2, len(xyDataObj))])
         testResults.append(r)
 
-    elif r["type"] == "xy_infl_pt":
-        varNames = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
+    elif r[type_name] == results_xy_infl_pt:
+        varNames = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
         # Get xy data
-        x = session.XYDataFromHistory(name=str(r["identifier"][0]["symbol"]), odb=odb, outputVariableName=varNames[0], steps=steps)
-        y = session.XYDataFromHistory(name=str(r["identifier"][1]["symbol"]), odb=odb, outputVariableName=varNames[1], steps=steps)
+        x = session.XYDataFromHistory(name=str(r[identifier_name][0][symbol_name]), odb=odb, outputVariableName=varNames[0], steps=steps)
+        y = session.XYDataFromHistory(name=str(r[identifier_name][1][symbol_name]), odb=odb, outputVariableName=varNames[1], steps=steps)
 
         # Combine the x and y data
         xy = combine(x, y)
@@ -446,13 +465,13 @@ for r in para["results"]:
         xy = resample(data=xy, numPts=10000)
 
         # Filter
-        if "filterCutOffFreq" in r["identifier"][1]:
+        if "filterCutOffFreq" in r[identifier_name][1]:
             session.XYData(data=xy, name="temp")
-            xy = butterworthFilter(xyData=session.xyDataObjects['temp'], cutoffFrequency=int(r["identifier"][1]["filterCutOffFreq"]))
+            xy = butterworthFilter(xyData=session.xyDataObjects['temp'], cutoffFrequency=int(r[identifier_name][1]["filterCutOffFreq"]))
             tmpName = xy.name
             session.xyDataObjects.changeKey(tmpName, 'slope')
         else:
-            session.XYData(data=xy, name="slope")
+            session.XYData(data=xy, name=results_slope)
         slopeXYObj = session.xyDataObjects['slope']
         odb.userData.XYData('slope', slopeXYObj)
 
@@ -471,15 +490,15 @@ for r in para["results"]:
 
         # Store the x, y pair at the inflection point
         x, y = zip(*session.xyDataObjects['windowed'])
-        r["computedValue"] = (xMax, interpolate(xMax, x, y))
+        r[compute_value_name] = (xMax, interpolate(xMax, x, y))
         testResults.append(r)
 
-    elif r["type"] == "disp_at_zero_y":
-        varNames = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
+    elif r[type_name] == results_disp_at_zero_y:
+        varNames = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
         # Get xy data
-        x = session.XYDataFromHistory(name=str(r["identifier"][0]["symbol"]), odb=odb, outputVariableName=varNames[0], steps=steps)
-        y = session.XYDataFromHistory(name=str(r["identifier"][1]["symbol"]), odb=odb, outputVariableName=varNames[1], steps=steps)
+        x = session.XYDataFromHistory(name=str(r[identifier_name][0][symbol_name]), odb=odb, outputVariableName=varNames[0], steps=steps)
+        y = session.XYDataFromHistory(name=str(r[identifier_name][1][symbol_name]), odb=odb, outputVariableName=varNames[1], steps=steps)
         xy = combine(x, y)
 
         # Window definition
@@ -508,16 +527,16 @@ for r in para["results"]:
         if disp_crit == 0:
             raise ValueError("disp_at_zero_y: Could not find a point where y data goes to zero")
 
-        r["computedValue"] = disp_crit
+        r[compute_value_name] = disp_crit
         testResults.append(r)
 
-    elif r["type"] == "log_stress_at_failure_init":
+    elif r[type_name] == results_log_stress_at_failure_init:
 
         # Load history data for failure indices and store xy object to list 'failed' if the index is failed
         failed = list()
         varNames = historyOutputNameFromIdentifier(identifier=r["failureIndices"], steps=steps)
         for i in range(0, len(varNames)):
-            n = str(r["failureIndices"][i]["symbol"])
+            n = str(r["failureIndices"][i][symbol_name])
             xy = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varNames[i], steps=steps)
             xy = session.xyDataObjects[n]
             odb.userData.XYData(n, xy)
@@ -550,7 +569,7 @@ for r in para["results"]:
         stressAtFailure = dict()
         varNames = historyOutputNameFromIdentifier(identifier=r["stressComponents"], steps=steps)
         for i in range(0, len(varNames)):
-            n = str(r["stressComponents"][i]["symbol"])
+            n = str(r["stressComponents"][i][symbol_name])
             xy = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varNames[i], steps=steps)
             xy = session.xyDataObjects[n]
             odb.userData.XYData(n, xy)
@@ -560,7 +579,7 @@ for r in para["results"]:
         additionalData = dict()
         varNames = historyOutputNameFromIdentifier(identifier=r["additionalIdentifiersToStore"], steps=steps)
         for i in range(0, len(varNames)):
-            n = str(r["additionalIdentifiersToStore"][i]["symbol"])
+            n = str(r["additionalIdentifiersToStore"][i][symbol_name])
             xy = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varNames[i], steps=steps)
             xy = session.xyDataObjects[n]
             odb.userData.XYData(n, xy)
@@ -583,12 +602,12 @@ for r in para["results"]:
         with open(logFileName, "a") as f:
             f.write(dataToWrite)
 
-    elif r["type"] == "slope":
-        varNames = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
+    elif r[type_name] == results_slope:
+        varNames = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
         # Get xy data
-        x = session.XYDataFromHistory(name=str(r["identifier"][0]["symbol"]), odb=odb, outputVariableName=varNames[0], steps=steps)
-        y = session.XYDataFromHistory(name=str(r["identifier"][1]["symbol"]), odb=odb, outputVariableName=varNames[1], steps=steps)
+        x = session.XYDataFromHistory(name=str(r[identifier_name][0][symbol_name]), odb=odb, outputVariableName=varNames[0], steps=steps)
+        y = session.XYDataFromHistory(name=str(r[identifier_name][1][symbol_name]), odb=odb, outputVariableName=varNames[1], steps=steps)
 
         # Combine the x and y data
         xy = combine(x, y)
@@ -620,29 +639,29 @@ for r in para["results"]:
 
         # Get the average value of the slope
         x, y = zip(*session.xyDataObjects['slope_xy_diff'])
-        r["computedValue"] = np.mean(y)
+        r[compute_value_name] = np.mean(y)
         testResults.append(r)
 
-    elif r["type"] == "finalValue":
+    elif r[type_name] == results_final_value:
         # This trys to automatically determine the appropriate position specifier
-        varName = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
+        varName = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
         # Get the history data
-        n = str(r["identifier"]["symbol"]) + '_' + steps[0] + '_' + str(r["type"])
+        n = str(r[identifier_name][symbol_name]) + '_' + steps[0] + '_' + str(r[type_name])
         xyDataObj = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varName, steps=steps)
         xy = session.xyDataObjects[n]
 
         # Get the value calculated in the analysis (last frame must equal to 1, which is total step time)
-        r["computedValue"] = xyDataObj[-1][1]
+        r[compute_value_name] = xyDataObj[-1][1]
 
         testResults.append(r)
 
-    elif r["type"] == "x_at_peak_in_xy":
-        varNames = historyOutputNameFromIdentifier(identifier=r["identifier"], steps=steps)
+    elif r[type_name] == results_x_at_peak_in_xy:
+        varNames = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
         # Get xy data
-        x = session.XYDataFromHistory(name=str(r["identifier"][0]["symbol"]), odb=odb, outputVariableName=varNames[0], steps=steps)
-        y = session.XYDataFromHistory(name=str(r["identifier"][1]["symbol"]), odb=odb, outputVariableName=varNames[1], steps=steps)
+        x = session.XYDataFromHistory(name=str(r[identifier_name][0][symbol_name]), odb=odb, outputVariableName=varNames[0], steps=steps)
+        y = session.XYDataFromHistory(name=str(r[identifier_name][1][symbol_name]), odb=odb, outputVariableName=varNames[1], steps=steps)
 
         # Combine the x and y data
         xy = combine(x, y)
@@ -658,9 +677,44 @@ for r in para["results"]:
         x_at_peak = x[y.index(y_max)]
 
         # Return
-        r["computedValue"] = x_at_peak
+        r[compute_value_name] = x_at_peak
         testResults.append(r)
 
+    elif r[type_name] == results_tabular:
+        varNames = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
+
+        # Get xy data
+        x = session.XYDataFromHistory(name=str(r[identifier_name][0][symbol_name]), odb=odb, outputVariableName=varNames[0],
+                                      steps=steps)
+        y = session.XYDataFromHistory(name=str(r[identifier_name][1][symbol_name]), odb=odb, outputVariableName=varNames[1],
+                                      steps=steps)
+
+        # Combine the x and y data
+        xy = combine(x, y)
+        tmpName = xy.name
+        xy_data_name = 'ld{}'.format(iii)
+        session.xyDataObjects.changeKey(tmpName, xy_data_name)
+        xy = session.xyDataObjects[xy_data_name]
+        odb.userData.XYData(xy_data_name, xy)
+
+        xy_np = np.asarray(xy)
+        x = xy_np[:, 0]
+        y = xy_np[:, 1]
+
+        # Numpy.interp requires x increasing
+        if np.all(np.diff(x) < 0):
+            raise Exception("x values must be monotonically increasing")
+
+        # Get the y values for the reference x values
+        xy_ref_values = r[reference_value_name]
+        x_ref_values = [_x for (_x, _) in xy_ref_values]
+        y_computed_values = np.interp(x_ref_values, x, y).tolist()
+        # list of tuples
+        xy_computed_values = [(x, y) for (x, y) in zip(x_ref_values, y_computed_values)]
+
+        # Return
+        r[compute_value_name] = xy_computed_values
+        testResults.append(r)
     else:
         raise NotImplementedError("test_case result data not recognized: " + str(r))
 

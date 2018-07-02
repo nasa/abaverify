@@ -443,7 +443,8 @@ class TestCase(unittest.TestCase):
 
         outputFileName = jobName + '_results.py'
         outputFileDir = os.path.join(os.getcwd(), 'testOutput')
-        if (os.path.isfile(os.path.join(outputFileDir, outputFileName))):
+        outputFilePath = os.path.join(outputFileDir, outputFileName)
+        if os.path.isfile(outputFilePath):
             sys.path.insert(0, outputFileDir)
             results = __import__(outputFileName[:-3]).results
 
@@ -452,7 +453,29 @@ class TestCase(unittest.TestCase):
                 # Loop through values if there are more than one
                 if hasattr(r['computedValue'], '__iter__'):
                     for i in range(0, len(r['computedValue'])):
-                        self.assertAlmostEqual(r['computedValue'][i], r['referenceValue'][i], delta=r['tolerance'][i])
+                        computed_val = r['computedValue'][i]
+                        reference_val = r['referenceValue'][i]
+
+                        if isinstance(reference_val, tuple):
+                            tolerance_for_result_obj = r['tolerance']
+                            # when there exists a tuple as a reference val then all other results and deltas
+                            # should also be tuples
+                            self.assertEqual(len(computed_val), len(reference_val),
+                                             "Specified reference value should be same length as Computed value")
+                            # tolerance may be specified as a single tuple or a list of tuples. If its the latter
+                            # then index and return the tuple
+                            if isinstance(tolerance_for_result_obj, tuple):
+                                tolerance = tolerance_for_result_obj
+                            else:
+                                tolerance = tolerance_for_result_obj[i]
+                            self.assertEqual(len(reference_val), len(tolerance),
+                                             "Specified tolerance tople should be the same length as the ref")
+                            # loop through entries in tuple (x and y)
+                            for (cv, rv, tolerance) in zip(computed_val, reference_val, tolerance):
+                                self.assertAlmostEqual(cv, rv, delta=tolerance)
+                        else:
+                            tolerance_for_result_obj = r['tolerance'][i]
+                            self.assertAlmostEqual(computed_val, reference_val, delta=tolerance_for_result_obj)
 
                 else:
                     if "tolerance" in r:
@@ -463,7 +486,7 @@ class TestCase(unittest.TestCase):
                         # No data to compare with, so pass the test
                         pass
         else:
-            self.fail('No results file provided by process_results.py')
+            self.fail('No results file provided by process_results.py. Looking for "%s"' % outputFilePath)
 
 
 class ParametricMetaClass(type):

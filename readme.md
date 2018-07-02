@@ -162,6 +162,7 @@ A variety of different types of results can be extracted from the odbs and compa
 - `slope`: finds the slope of an xy data set
 - `finalValue`: finds the y value at the last increment in the xy data set
 - `x_at_peak_in_xy`: finds the x-value corresponding to the absolute peak in the y-value
+- `tabular`: Compares the values for a list of tuples specifying x, y points [(x1, y1), (x2, y2)...]
 
 ## Automatic testing
 Abaverify has the capability to run a series of tests, generate a report, and plot run times against historical run times. See `automatic.py` and `automatic_testing_script.py` for details.
