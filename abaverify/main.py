@@ -469,7 +469,7 @@ class TestCase(unittest.TestCase):
                             else:
                                 tolerances = tolerance_for_result_obj
                             self.assertEqual(len(computed_val), len(tolerances),
-                                             "Specified delta should be same length as Computed value")
+                                             "Specified tolerance should be same length as Computed value or be a single tuple")
                             # loop through entries in tuple
                             for (cv, rv, tolerance) in zip(computed_val, reference_val, tolerances):
                                 self.assertAlmostEqual(cv, rv, delta=tolerance)
