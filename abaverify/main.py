@@ -455,19 +455,26 @@ class TestCase(unittest.TestCase):
                     for i in range(0, len(r['computedValue'])):
                         computed_val = r['computedValue'][i]
                         reference_val = r['referenceValue'][i]
-                        delta = r['tolerance'][i]
-                        if isinstance(computed_val, tuple):
-                            # --- when there exists a tuple as a reference val then all other results and deltas
-                            # --- should also be tuples
+                        tolerance_for_result_obj = r['tolerance'][i]
+                        if isinstance(reference_val, tuple):
+                            # when there exists a tuple as a reference val then all other results and deltas
+                            # should also be tuples
                             self.assertEqual(len(computed_val), len(reference_val),
                                              "Specified reference value should be same length as Computed value")
-                            self.assertEqual(len(computed_val), len(delta),
+                            # tolerance may be specified as a single tuple or a list of tuples. Reform
+                            # the tolerance to a list of tuples if it is the a single tuple so that downstream
+                            # the two cases may be treated the sames
+                            if isinstance(tolerance_for_result_obj, tuple):
+                                tolerances = [tolerance_for_result_obj] * len(computed_val)
+                            else:
+                                tolerances = tolerance_for_result_obj
+                            self.assertEqual(len(computed_val), len(tolerances),
                                              "Specified delta should be same length as Computed value")
-                            # --- loop through entries in tuple
-                            for (cv, rv, d) in zip(computed_val, reference_val, delta):
-                                self.assertAlmostEqual(cv, rv, delta=d)
+                            # loop through entries in tuple
+                            for (cv, rv, tolerance) in zip(computed_val, reference_val, tolerances):
+                                self.assertAlmostEqual(cv, rv, delta=tolerance)
                         else:
-                            self.assertAlmostEqual(computed_val, reference_val, delta=delta)
+                            self.assertAlmostEqual(computed_val, reference_val, delta=tolerance_for_result_obj)
 
                 else:
                     if "tolerance" in r:

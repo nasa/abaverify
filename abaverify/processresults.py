@@ -46,8 +46,7 @@ Test types:
 7. finalValue
     Last output value.
 8. tabular
-    Given a list of (x,y) points confirms that a point, within the specified, tolerance exists in post processes
-    results.
+    Compares the values for a list of tuples specifying x, y points [(x1, y1), (x2, y2)...]
 
 """
 
@@ -329,7 +328,7 @@ def write_results(results_to_write, fileName, depth=0):
             f.write('\t' * depth + '],\n')
 
 
-# --- keys used in results dict
+# keys used in results dict
 type_name = "type"
 compute_value_name = "computedValue"
 reference_value_name = "referenceValue"
@@ -361,6 +360,7 @@ if jobName + '.odb' not in os.listdir(os.getcwd()):
 
 # Load ODB
 odb = session.openOdb(name=os.path.join(os.getcwd(), jobName + '.odb'), readOnly=readOnly)
+
 # Report errors
 if odb.diagnosticData.numberOfAnalysisErrors > 0:
     # Ignore excessive element distortion errors when generating failure envelopes
@@ -679,6 +679,7 @@ for r in para[results_name]:
         # Return
         r[compute_value_name] = x_at_peak
         testResults.append(r)
+
     elif r[type_name] == results_tabular:
         varNames = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
@@ -707,7 +708,7 @@ for r in para[results_name]:
         xy_ref_values = r[reference_value_name]
         x_ref_values = [_x for (_x, _) in xy_ref_values]
         y_computed_values = np.interp(x_ref_values, x, y).tolist()
-        # --- list of tuples
+        # list of tuples
         xy_computed_values = [(x, y) for (x, y) in zip(x_ref_values, y_computed_values)]
 
         # Return
