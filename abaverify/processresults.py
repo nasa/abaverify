@@ -45,6 +45,9 @@ Test types:
     Finds the slope of an x-y data curve.
 7. finalValue
     Last output value.
+8. tabular
+    Given a list of (x,y) points confirms that a point, within the specified, tolerance exists in post processes
+    results.
 
 """
 
@@ -342,6 +345,7 @@ results_log_stress_at_failure_init = "log_stress_at_failure_init"
 results_slope = "slope"
 results_final_value = "finalValue"
 results_x_at_peak_in_xy = "x_at_peak_in_xy"
+results_tabular = "tabular"
 debug(os.getcwd())
 
 # Arguments
@@ -674,6 +678,40 @@ for r in para[results_name]:
 
         # Return
         r[compute_value_name] = x_at_peak
+        testResults.append(r)
+    elif r[type_name] == results_tabular:
+        varNames = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
+
+        # Get xy data
+        x = session.XYDataFromHistory(name=str(r[identifier_name][0][symbol_name]), odb=odb, outputVariableName=varNames[0],
+                                      steps=steps)
+        y = session.XYDataFromHistory(name=str(r[identifier_name][1][symbol_name]), odb=odb, outputVariableName=varNames[1],
+                                      steps=steps)
+
+        # Combine the x and y data
+        xy = combine(x, y)
+        tmpName = xy.name
+        session.xyDataObjects.changeKey(tmpName, 'ld')
+        xy = session.xyDataObjects['ld']
+        odb.userData.XYData('ld', xy)
+
+        xy_np = np.asarray(xy)
+        x = xy_np[:, 0]
+        y = xy_np[:, 1]
+
+        # Numpy.interp requires x increasing
+        if np.all(np.diff(x) < 0):
+            raise Exception("x values must be monotonically increasing")
+
+        # Get the y values for the reference x values
+        xy_ref_values = r[reference_value_name]
+        x_ref_values = [_x for (_x, _) in xy_ref_values]
+        y_computed_values = np.interp(x_ref_values, x, y).tolist()
+        # --- list of tuples
+        xy_computed_values = [(x, y) for (x, y) in zip(x_ref_values, y_computed_values)]
+
+        # Return
+        r[compute_value_name] = xy_computed_values
         testResults.append(r)
     else:
         raise NotImplementedError("test_case result data not recognized: " + str(r))

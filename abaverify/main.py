@@ -443,7 +443,8 @@ class TestCase(unittest.TestCase):
 
         outputFileName = jobName + '_results.py'
         outputFileDir = os.path.join(os.getcwd(), 'testOutput')
-        if (os.path.isfile(os.path.join(outputFileDir, outputFileName))):
+        outputFilePath = os.path.join(outputFileDir, outputFileName)
+        if os.path.isfile(outputFilePath):
             sys.path.insert(0, outputFileDir)
             results = __import__(outputFileName[:-3]).results
 
@@ -452,7 +453,21 @@ class TestCase(unittest.TestCase):
                 # Loop through values if there are more than one
                 if hasattr(r['computedValue'], '__iter__'):
                     for i in range(0, len(r['computedValue'])):
-                        self.assertAlmostEqual(r['computedValue'][i], r['referenceValue'][i], delta=r['tolerance'][i])
+                        computed_val = r['computedValue'][i]
+                        reference_val = r['referenceValue'][i]
+                        delta = r['tolerance'][i]
+                        if isinstance(computed_val, tuple):
+                            # --- when there exists a tuple as a reference val then all other results and deltas
+                            # --- should also be tuples
+                            self.assertEqual(len(computed_val), len(reference_val),
+                                             "Specified reference value should be same length as Computed value")
+                            self.assertEqual(len(computed_val), len(delta),
+                                             "Specified delta should be same length as Computed value")
+                            # --- loop through entries in tuple
+                            for (cv, rv, d) in zip(computed_val, reference_val, delta):
+                                self.assertAlmostEqual(cv, rv, delta=d)
+                        else:
+                            self.assertAlmostEqual(computed_val, reference_val, delta=delta)
 
                 else:
                     if "tolerance" in r:
@@ -463,7 +478,7 @@ class TestCase(unittest.TestCase):
                         # No data to compare with, so pass the test
                         pass
         else:
-            self.fail('No results file provided by process_results.py')
+            self.fail('No results file provided by process_results.py. Looking for "%s"' % outputFilePath)
 
 
 class ParametricMetaClass(type):
