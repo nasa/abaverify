@@ -274,6 +274,7 @@ def write_results(results_to_write, fileName, depth=0):
     :type depth: int
     """
 
+    debug(fileName)
     # Create the file if it does not exist. If it does exist, open it for appending
     if depth == 0:
         f = open(fileName, 'w')
@@ -345,6 +346,11 @@ results_slope = "slope"
 results_final_value = "finalValue"
 results_x_at_peak_in_xy = "x_at_peak_in_xy"
 results_tabular = "tabular"
+
+av_id = "av_id"
+x_eval_statement = "x_eval_statement"
+y_eval_statement = "y_eval_statement"
+
 debug(os.getcwd())
 
 # Arguments
@@ -683,11 +689,47 @@ for iii, r in enumerate(para[results_name]):
     elif r[type_name] == results_tabular:
         varNames = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
-        # Get xy data
-        x = session.XYDataFromHistory(name=str(r[identifier_name][0][symbol_name]), odb=odb, outputVariableName=varNames[0],
-                                      steps=steps)
-        y = session.XYDataFromHistory(name=str(r[identifier_name][1][symbol_name]), odb=odb, outputVariableName=varNames[1],
-                                      steps=steps)
+        def evaluate_statement(identifier_list, var_names, eval_statement):
+            '''
+
+            :param identifier_list: list of dictionaries which have information about what XYDataFromHistory to pull
+            :param var_names: a list (with a matching correspondence in identifier_list) which is the well formed variable name
+                              used for interroggating xyDataFromHistory
+            :param eval_statement: a str statement evaluated using python eval. By convention variables should be accesses
+                                   by using "d[key]". d is a local variable created which maps the av_id to its
+                                   corresponding xydata.
+            :return: an xydata object returned by evaluating eval
+            '''
+
+            av_id_missing_err_message = "The identifiers specified in identifier_list must" \
+                                        " all contain the av_id key. The following does not: {}".format(identifier_list)
+            assert all([av_id in ident for ident in identifier_list]), av_id_missing_err_message
+            # Build local variable d (maps av_id -> corresponding data
+            d = {}
+            for (ident, var_name) in zip(identifier_list, var_names):
+                data = session.XYDataFromHistory(name=str(ident[symbol_name]), odb=odb,
+                                              outputVariableName=var_name,
+                                              steps=steps)
+                d[ident[av_id]] = data
+            # A well formed eval_statement accesses the local variable d
+            return eval(eval_statement)
+
+
+        # If specify eval statements than x, y aren't positional
+        # but instead are calculated using the uniquely defined av_id val to access variables
+        if x_eval_statement in r and y_eval_statement in r:
+            x = evaluate_statement(identifier_list=r[identifier_name], var_names=varNames,
+                                   eval_statement=r[x_eval_statement])
+            y = evaluate_statement(identifier_list=r[identifier_name], var_names=varNames,
+                                   eval_statement=r[y_eval_statement])
+        else:
+            # Get xy data (positionally)
+            x = session.XYDataFromHistory(name=str(r[identifier_name][0][symbol_name]), odb=odb,
+                                          outputVariableName=varNames[0],
+                                          steps=steps)
+            y = session.XYDataFromHistory(name=str(r[identifier_name][1][symbol_name]), odb=odb,
+                                          outputVariableName=varNames[1],
+                                          steps=steps)
 
         # Combine the x and y data
         xy = combine(x, y)
