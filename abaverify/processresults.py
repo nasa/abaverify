@@ -347,9 +347,9 @@ results_final_value = "finalValue"
 results_x_at_peak_in_xy = "x_at_peak_in_xy"
 results_tabular = "tabular"
 
-av_id = "av_id"
-x_eval_statement = "x_eval_statement"
-y_eval_statement = "y_eval_statement"
+label_name = "label"
+xEvalStatement = "xEvalStatement"
+yEvalStatement = "yEvalStatement"
 
 debug(os.getcwd())
 
@@ -696,32 +696,32 @@ for iii, r in enumerate(para[results_name]):
             :param var_names: a list (with a matching correspondence in identifier_list) which is the well formed variable name
                               used for interroggating xyDataFromHistory
             :param eval_statement: a str statement evaluated using python eval. By convention variables should be accesses
-                                   by using "d[key]". d is a local variable created which maps the av_id to its
+                                   by using "d[key]". d is a local variable created which maps the label to its
                                    corresponding xydata.
             :return: an xydata object returned by evaluating eval
             '''
 
-            av_id_missing_err_message = "The identifiers specified in identifier_list must" \
-                                        " all contain the av_id key. The following does not: {}".format(identifier_list)
-            assert all([av_id in ident for ident in identifier_list]), av_id_missing_err_message
-            # Build local variable d (maps av_id -> corresponding data
+            label_missing_err_message = "The identifiers specified in identifier_list must" \
+                                        " all contain the label key. The following does not: {}".format(identifier_list)
+            assert all([label_name in ident for ident in identifier_list]), label_missing_err_message
+            # Build local variable d (maps label -> corresponding data
             d = {}
             for (ident, var_name) in zip(identifier_list, var_names):
                 data = session.XYDataFromHistory(name=str(ident[symbol_name]), odb=odb,
                                               outputVariableName=var_name,
                                               steps=steps)
-                d[ident[av_id]] = data
+                d[ident[label_name]] = data
             # A well formed eval_statement accesses the local variable d
             return eval(eval_statement)
 
 
         # If specify eval statements than x, y aren't positional
-        # but instead are calculated using the uniquely defined av_id val to access variables
-        if x_eval_statement in r and y_eval_statement in r:
+        # but instead are calculated using the uniquely defined label val to access variables
+        if xEvalStatement in r and yEvalStatement in r:
             x = evaluate_statement(identifier_list=r[identifier_name], var_names=varNames,
-                                   eval_statement=r[x_eval_statement])
+                                   eval_statement=r[xEvalStatement])
             y = evaluate_statement(identifier_list=r[identifier_name], var_names=varNames,
-                                   eval_statement=r[y_eval_statement])
+                                   eval_statement=r[yEvalStatement])
         else:
             # Get xy data (positionally)
             x = session.XYDataFromHistory(name=str(r[identifier_name][0][symbol_name]), odb=odb,

@@ -1,26 +1,34 @@
+l = 10
+area = 100
 parameters = {
     "results": [
         {
             "type": "tabular",
             "identifier": [
-                {   "av_id": "x",
+                {   "label": "x1",
                     "symbol": "U2",
                     "nset": "LOADAPP"
                 },
-                {   "av_id": "y",
+                {   "label": "x2",
+                    "symbol": "U2",
+                    "position": "Node 4",
+                    "nset": "LOADFOLLOWERS"
+                },
+                {   "label": "y",
                     "symbol": "RF2",
                     "nset": "LOADAPP"
                 }
             ],
-            "x_eval_statement": "d['x']",
-            "y_eval_statement": "d['y']",
+            # Use eval statements to calculate a reference strain and stress val from abaqus output of force and disp
+            "xEvalStatement": "(d['x1'] + d['x2']) / (2 * {l})".format(l=l),
+            "yEvalStatement": "d['y']/ {area}".format(area=area),
             "referenceValue": [
                             (0.0, 0.0), 
-                            (0.00582908, 149.516), 
-                            (0.00944326, 242.22), 
-                            (0.0138836, 356.113)
+                            (0.000582908, 1.49516), 
+                            (0.000944326, 2.4222), 
+                            (0.00138836, 3.56113)
                             ],
-            "tolerance": (0.001, 35.0)
+            "tolerance": (0.0001, 0.350)
         }
     ]
 }

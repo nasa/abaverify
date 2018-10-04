@@ -151,6 +151,7 @@ tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 --tim
 ```
 - `-V` or `--verbose` can be specified to print the Abaqus log data to the terminal.
 
+
 ## Results `type`
 A variety of different types of results can be extracted from the odbs and compared with reference values. A list of each support type and brief explanation are provided below:
 - `max`: finds the maximum value of an xy data set
@@ -162,7 +163,58 @@ A variety of different types of results can be extracted from the odbs and compa
 - `slope`: finds the slope of an xy data set
 - `finalValue`: finds the y value at the last increment in the xy data set
 - `x_at_peak_in_xy`: finds the x-value corresponding to the absolute peak in the y-value
-- `tabular`: Compares the values for a list of tuples specifying x, y points [(x1, y1), (x2, y2)...]
+- `tabular`: compares the values for a list of tuples specifying x, y points [(x1, y1), (x2, y2)...]. See example for further details
+
+### Tabular Example
+
+The tabular example by default uses the two identifier dict objects to define x and y data respectively (which is thusly compared to a
+list of tuples (specified as referenceValue). Additionally, a more advanced usage is allowed within the tabular option to specify a pythonic statement for combinging
+multiple identifier results into a set of x values (and y values). This is best seen by way of example:
+
+```
+    l = 10
+    area = 100
+    ...
+    "results": [
+        {
+            "type": "tabular",
+            "identifier": [
+                {   "label": "x1",
+                    "symbol": "U2",
+                    "nset": "LOADAPP"
+                },
+                {   "label": "x2",
+                    "symbol": "U2",
+                    "position": "Node 4",
+                    "nset": "LOADFOLLOWERS"
+                },
+                {   "label": "y",
+                    "symbol": "RF2",
+                    "nset": "LOADAPP"
+                }
+            ],
+            # Use eval statements to calculate a reference strain and stress val from abaqus output of force and disp
+            "xEvalStatement": "(d['x1'] + d['x2']) / (2 * {l})".format(l=l),
+            "yEvalStatement": "d['y']/ {area}".format(area=area),
+            "referenceValue": [
+                            (0.0, 0.0), 
+                            (0.000582908, 1.49516), 
+                            (0.000944326, 2.4222), 
+                            (0.00138836, 3.56113)
+                            ],
+            "tolerance": (0.0001, 0.350)
+        }
+    ]
+```
+
+In the example above *label*\s are given to identifier dictionaries (for subsequent use in evaluation statements). 
+Then a *xEvalStatement* and *yEvalStatement* is provided which can be any pythonic evaluatable expression (generally,
+some combination of the xy history results specified by the labeled identifier objects). In this example, two displacements
+are extracted from the odb (labeled *x1* and *x2*). They are averaged together and then normalized by some length to determine 
+a reference strain value. Because this combination is defined in the *xEvalStatement* these points will become the basis for
+the x's. Similarly y points are defined by normalizing force by area for reference stress determination. After
+the definition of x and y points through eval statements the comparison for test is identical to the
+default tabular implementation (comparison to referenceValue within specified tolerance). 
 
 ## Automatic testing
 Abaverify has the capability to run a series of tests, generate a report, and plot run times against historical run times. See `automatic.py` and `automatic_testing_script.py` for details.

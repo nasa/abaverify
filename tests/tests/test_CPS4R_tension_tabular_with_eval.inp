@@ -91,6 +91,8 @@ S11, S22
 *Output, history, time interval=0.0001
 *Node Output, nset=loadApp
 RF2, U2
+*Node Output, nset=loadFollowers
+RF2, U2
 *Energy Output
 ALLAE, ALLCD, ALLDMD, ALLFD, ALLIE, ALLKE, ALLMW, ALLPD, ALLSE, ALLVD, ALLWK, ETOTAL
 *End Step
