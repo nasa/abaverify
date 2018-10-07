@@ -165,7 +165,34 @@ A variety of different types of results can be extracted from the odbs and compa
 - `x_at_peak_in_xy`: finds the x-value corresponding to the absolute peak in the y-value
 - `tabular`: compares the values for a list of tuples specifying x, y points [(x1, y1), (x2, y2)...]. See example for further details
 
-### Tabular Example
+### Eval Statement
+
+Every abaverify results type (max, min, tabular, etc.) has a default usage where either
+one history object is specified (using the identifier dictionary object) or two history
+objects (x and y) are specified. Essentially, a value like displacement (u) and reaction force (rf)
+can be extracted from the abaqus results file and asserted against directly. 
+
+There are times when this is limiting and some combination of Abaqus quantities is more convenient to
+be asserted against. If the results type specifies only a single a single history object then an *evalStatement*
+key may be specified within the results specifier dictionary. If there results type specifies an x and y history
+identifier then two separate evalStatements ( *xEvalStatement* and *yEvalStatement* ). 
+
+An eval statement is generally an arithmetic combination of results history objects. An eval
+statement is a string where previously defined history objects maybe referenced (via there assigned *label* key).
+An example of an eval statement is given below:
+
+```
+    "evalStatement": "(d['n1_U1'] + d['n2_U1']) / 10.0"
+```
+
+In the example above, *n1_U1* and *n2_U2* would be identifying dictionaries with those very labels (labels should
+therefore be unique) which are summed and then divided by 10.0.  
+
+NOTE: To access a result defined in an identifier object the general syntax is d[<label>]. This is because
+internally a dictionary of results (d) is created where label is made to be key. Therefore, to access the data
+in the dictionary d one must use the python syntax to do so (d[<label>]).
+
+#### Tabular Example Using Eval Statement
 
 The tabular example by default uses the two identifier dict objects to define x and y data respectively (which is thusly compared to a
 list of tuples specified as referenceValue). Additionally, a more advanced usage is allowed within the tabular option to specify a pythonic statement for combinging
@@ -207,7 +234,7 @@ multiple identifier results into a set of x values (and y values). This is best 
     ]
 ```
 
-In the example above *label*\s are given to identifier dictionaries (for subsequent use in evaluation statements). 
+In the example above *label*s are given to identifier dictionaries (for subsequent use in evaluation statements). 
 Then a *xEvalStatement* and *yEvalStatement* is provided which can be any pythonic evaluatable expression (generally,
 some combination of the xy history results specified by the labeled identifier objects). In this example, two displacements
 are extracted from the odb (labeled *x1* and *x2*). They are averaged together and then normalized by some length to determine 

@@ -36,7 +36,7 @@ class SingleElementTests(av.TestCase):
         '''
         self.runTest('test_CPS4R_tension_tabular')
 
-    def test_CPS4R_tension_tabular(self):
+    def test_CPS4R_tension_tabular_with_eval(self):
         '''
         Confirm that the tabular query works with eval statements.
         Eval statements allow you to assign a label_name to the results
@@ -49,6 +49,9 @@ class SingleElementTests(av.TestCase):
         the "av_id" key
         '''
         self.runTest('test_CPS4R_tension_tabular_with_eval')
+    
+    def test_CPS4R_compression_with_eval(self):
+        self.runTest('test_CPS4R_compression_with_eval')
 
 # That's it for setup. Add as many tests as you want!
 
