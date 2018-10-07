@@ -168,11 +168,11 @@ A variety of different types of results can be extracted from the odbs and compa
 ### Tabular Example
 
 The tabular example by default uses the two identifier dict objects to define x and y data respectively (which is thusly compared to a
-list of tuples (specified as referenceValue). Additionally, a more advanced usage is allowed within the tabular option to specify a pythonic statement for combinging
+list of tuples specified as referenceValue). Additionally, a more advanced usage is allowed within the tabular option to specify a pythonic statement for combinging
 multiple identifier results into a set of x values (and y values). This is best seen by way of example:
 
 ```
-    l = 10
+    length = 10
     area = 100
     ...
     "results": [
@@ -194,7 +194,7 @@ multiple identifier results into a set of x values (and y values). This is best 
                 }
             ],
             # Use eval statements to calculate a reference strain and stress val from abaqus output of force and disp
-            "xEvalStatement": "(d['x1'] + d['x2']) / (2 * {l})".format(l=l),
+            "xEvalStatement": "(d['x1'] + d['x2']) / (2 * {length})".format(length=length),
             "yEvalStatement": "d['y']/ {area}".format(area=area),
             "referenceValue": [
                             (0.0, 0.0), 
