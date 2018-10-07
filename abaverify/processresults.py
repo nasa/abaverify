@@ -274,7 +274,6 @@ def write_results(results_to_write, fileName, depth=0):
     :type depth: int
     """
 
-    debug(fileName)
     # Create the file if it does not exist. If it does exist, open it for appending
     if depth == 0:
         f = open(fileName, 'w')
