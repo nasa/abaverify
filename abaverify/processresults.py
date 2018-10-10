@@ -328,6 +328,63 @@ def write_results(results_to_write, fileName, depth=0):
             f.write('\t' * depth + '],\n')
 
 
+def evaluate_statement(identifier_list, var_names, eval_statement):
+    '''
+
+    :param identifier_list: list of dictionaries which have information about what XYDataFromHistory to pull
+    :param var_names: a list (with a matching correspondence in identifier_list) which is the well formed variable name
+                      used for interroggating xyDataFromHistory
+    :param eval_statement: a str statement evaluated using python eval. By convention variables should be accesses
+                           by using "d[key]". d is a local variable created which maps the label to its
+                           corresponding xydata.
+    :return: an xydata object returned by evaluating eval
+    '''
+
+    label_missing_err_message = "The identifiers specified in identifier_list must" \
+                                " all contain the label key. The following does not: {}".format(identifier_list)
+    assert all([label_name in ident for ident in identifier_list]), label_missing_err_message
+    # Build local variable d (maps label -> corresponding data
+    d = {}
+    for (ident, var_name) in zip(identifier_list, var_names):
+        data = session.XYDataFromHistory(name=str(ident[symbol_name]), odb=odb,
+                                      outputVariableName=var_name,
+                                      steps=steps)
+        d[ident[label_name]] = data
+    # A well formed eval_statement accesses the local variable d
+    return eval(eval_statement)
+
+
+def getX(r, varNames):
+    # If specify eval statements than x, y aren't positional
+    # but instead are calculated using the uniquely defined label val to access variables
+    if xEvalStatement in r and yEvalStatement in r:
+        x = evaluate_statement(identifier_list=r[identifier_name], var_names=varNames,
+                               eval_statement=r[xEvalStatement])
+    else:
+        # Get xy data (positionally)
+        x = session.XYDataFromHistory(name=str(r[identifier_name][0][symbol_name]), odb=odb,
+                                      outputVariableName=varNames[0],
+                                      steps=steps)
+    return x
+
+def getY(r, varNames):
+    # If specify eval statements than x, y aren't positional
+    # but instead are calculated using the uniquely defined label val to access variables
+    if xEvalStatement in r and yEvalStatement in r:
+        y = evaluate_statement(identifier_list=r[identifier_name], var_names=varNames,
+                               eval_statement=r[yEvalStatement])
+    else:
+        # Get xy data (positionally)
+        y = session.XYDataFromHistory(name=str(r[identifier_name][1][symbol_name]), odb=odb,
+                                      outputVariableName=varNames[1],
+                                      steps=steps)
+    return y
+
+def getXY(r, varNames):
+    x = getX(r, varNames)
+    y = getY(r, varNames)
+    return x, y
+
 # keys used in results dict
 type_name = "type"
 compute_value_name = "computedValue"
@@ -345,6 +402,12 @@ results_slope = "slope"
 results_final_value = "finalValue"
 results_x_at_peak_in_xy = "x_at_peak_in_xy"
 results_tabular = "tabular"
+
+label_name = "label"
+xEvalStatement = "xEvalStatement"
+yEvalStatement = "yEvalStatement"
+evalStatement = "evalStatement"
+
 debug(os.getcwd())
 
 # Arguments
@@ -406,16 +469,23 @@ for iii, r in enumerate(para[results_name]):
         varName = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
         # Get the history data
-        n = str(r[identifier_name][symbol_name]) + '_' + steps[0] + '_' + str(r[type_name])
-        xyDataObj = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varName, steps=steps)
-        xy = session.xyDataObjects[n]
+        identifier_list = [r[identifier_name]]
+        if evalStatement in r:
+            debug("evalStatement found")
+            xy = evaluate_statement(identifier_list=identifier_list, var_names=[varName],
+                                    eval_statement=r[evalStatement])
+        else:
+            debug("evalStatement not found")
+            n = str(r[identifier_name][symbol_name]) + '_' + steps[0] + '_' + str(r[type_name])
+            xyDataObj = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varName, steps=steps)
+            xy = session.xyDataObjects[n]
         # odb.userData.XYData(n, xy)
 
         # Get the value calculated in the analysis (last frame must equal to 1, which is total step time)
         if r[type_name] == results_max:
-            r[compute_value_name] = max([pt[1] for pt in xyDataObj])
+            r[compute_value_name] = max([pt[1] for pt in xy])
         else:
-            r[compute_value_name] = min([pt[1] for pt in xyDataObj])
+            r[compute_value_name] = min([pt[1] for pt in xy])
         testResults.append(r)
 
     # Enforce continuity
@@ -425,19 +495,22 @@ for iii, r in enumerate(para[results_name]):
         varName = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
         # Get the history data
-        xyDataObj = session.XYDataFromHistory(name='XYData-1', odb=odb, outputVariableName=varName, steps=steps)
+
+        if evalStatement in r:
+            xy = evaluate_statement(identifier_list=identifier_list, var_names=[varName],
+                                    eval_statement=r[evalStatement])
+        else:
+            xy = session.XYDataFromHistory(name='XYData-1', odb=odb, outputVariableName=varName, steps=steps)
 
         # Get the maximum change in the specified value
-        r[compute_value_name] = max([max(r[reference_value_name], abs(xyDataObj[x][1] - xyDataObj[x - 1][1])) for x in range(2, len(xyDataObj))])
+        r[compute_value_name] = max([max(r[reference_value_name], abs(xy[x][1] - xy[x - 1][1])) for x in range(2, len(xy))])
         testResults.append(r)
 
     elif r[type_name] == results_xy_infl_pt:
         varNames = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
         # Get xy data
-        x = session.XYDataFromHistory(name=str(r[identifier_name][0][symbol_name]), odb=odb, outputVariableName=varNames[0], steps=steps)
-        y = session.XYDataFromHistory(name=str(r[identifier_name][1][symbol_name]), odb=odb, outputVariableName=varNames[1], steps=steps)
-
+        x, y = getXY(r, varNames)
         # Combine the x and y data
         xy = combine(x, y)
         tmpName = xy.name
@@ -497,8 +570,9 @@ for iii, r in enumerate(para[results_name]):
         varNames = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
         # Get xy data
-        x = session.XYDataFromHistory(name=str(r[identifier_name][0][symbol_name]), odb=odb, outputVariableName=varNames[0], steps=steps)
-        y = session.XYDataFromHistory(name=str(r[identifier_name][1][symbol_name]), odb=odb, outputVariableName=varNames[1], steps=steps)
+        x, y = getXY(r, varNames)
+        #y = session.XYDataFromHistory(name=str(r[identifier_name][1][symbol_name]), odb=odb, outputVariableName=varNames[1], steps=steps)
+        #x = session.XYDataFromHistory(name=str(r[identifier_name][0][symbol_name]), odb=odb, outputVariableName=varNames[0], steps=steps)
         xy = combine(x, y)
 
         # Window definition
@@ -536,10 +610,15 @@ for iii, r in enumerate(para[results_name]):
         failed = list()
         varNames = historyOutputNameFromIdentifier(identifier=r["failureIndices"], steps=steps)
         for i in range(0, len(varNames)):
-            n = str(r["failureIndices"][i][symbol_name])
-            xy = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varNames[i], steps=steps)
-            xy = session.xyDataObjects[n]
-            odb.userData.XYData(n, xy)
+
+            if evalStatement in r:
+                xy = evaluate_statement(identifier_list=identifier_list, var_names=[varName],
+                                        eval_statement=r[evalStatement])
+            else:
+                n = str(r["failureIndices"][i][symbol_name])
+                xy = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varNames[i], steps=steps)
+                xy = session.xyDataObjects[n]
+            #odb.userData.XYData(n, xy)
             for y in reversed(xy):
                 if y[1] >= 1.0:
                     failed.append(xy)
@@ -606,8 +685,9 @@ for iii, r in enumerate(para[results_name]):
         varNames = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
         # Get xy data
-        x = session.XYDataFromHistory(name=str(r[identifier_name][0][symbol_name]), odb=odb, outputVariableName=varNames[0], steps=steps)
-        y = session.XYDataFromHistory(name=str(r[identifier_name][1][symbol_name]), odb=odb, outputVariableName=varNames[1], steps=steps)
+        x, y = getXY(r, varNames)
+        #x = session.XYDataFromHistory(name=str(r[identifier_name][0][symbol_name]), odb=odb, outputVariableName=varNames[0], steps=steps)
+        #y = session.XYDataFromHistory(name=str(r[identifier_name][1][symbol_name]), odb=odb, outputVariableName=varNames[1], steps=steps)
 
         # Combine the x and y data
         xy = combine(x, y)
@@ -647,9 +727,14 @@ for iii, r in enumerate(para[results_name]):
         varName = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
         # Get the history data
-        n = str(r[identifier_name][symbol_name]) + '_' + steps[0] + '_' + str(r[type_name])
-        xyDataObj = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varName, steps=steps)
-        xy = session.xyDataObjects[n]
+        if evalStatement in r:
+            xy = evaluate_statement(identifier_list=identifier_list, var_names=[varName],
+                                    eval_statement=r[evalStatement])
+        else:
+            n = str(r[identifier_name][symbol_name]) + '_' + steps[0] + '_' + str(r[type_name])
+            xyDataObj = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varName, steps=steps)
+            xy = session.xyDataObjects[n]
+
 
         # Get the value calculated in the analysis (last frame must equal to 1, which is total step time)
         r[compute_value_name] = xyDataObj[-1][1]
@@ -660,8 +745,9 @@ for iii, r in enumerate(para[results_name]):
         varNames = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
         # Get xy data
-        x = session.XYDataFromHistory(name=str(r[identifier_name][0][symbol_name]), odb=odb, outputVariableName=varNames[0], steps=steps)
-        y = session.XYDataFromHistory(name=str(r[identifier_name][1][symbol_name]), odb=odb, outputVariableName=varNames[1], steps=steps)
+        x, y = getXY(r, varNames)
+        #x = session.XYDataFromHistory(name=str(r[identifier_name][0][symbol_name]), odb=odb, outputVariableName=varNames[0], steps=steps)
+        #y = session.XYDataFromHistory(name=str(r[identifier_name][1][symbol_name]), odb=odb, outputVariableName=varNames[1], steps=steps)
 
         # Combine the x and y data
         xy = combine(x, y)
@@ -683,11 +769,8 @@ for iii, r in enumerate(para[results_name]):
     elif r[type_name] == results_tabular:
         varNames = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
-        # Get xy data
-        x = session.XYDataFromHistory(name=str(r[identifier_name][0][symbol_name]), odb=odb, outputVariableName=varNames[0],
-                                      steps=steps)
-        y = session.XYDataFromHistory(name=str(r[identifier_name][1][symbol_name]), odb=odb, outputVariableName=varNames[1],
-                                      steps=steps)
+
+        x, y = getXY(r, varNames)
 
         # Combine the x and y data
         xy = combine(x, y)

@@ -151,6 +151,7 @@ tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 --tim
 ```
 - `-V` or `--verbose` can be specified to print the Abaqus log data to the terminal.
 
+
 ## Results `type`
 A variety of different types of results can be extracted from the odbs and compared with reference values. A list of each support type and brief explanation are provided below:
 - `max`: finds the maximum value of an xy data set
@@ -162,7 +163,85 @@ A variety of different types of results can be extracted from the odbs and compa
 - `slope`: finds the slope of an xy data set
 - `finalValue`: finds the y value at the last increment in the xy data set
 - `x_at_peak_in_xy`: finds the x-value corresponding to the absolute peak in the y-value
-- `tabular`: Compares the values for a list of tuples specifying x, y points [(x1, y1), (x2, y2)...]
+- `tabular`: compares the values for a list of tuples specifying x, y points [(x1, y1), (x2, y2)...]. See example for further details
+
+### Eval Statement
+
+Every abaverify results type (max, min, tabular, etc.) has a default usage where either
+one history object is specified (using the identifier dictionary object) or two history
+objects (x and y) are specified. Essentially, a value like displacement (u) and reaction force (rf)
+can be extracted from the abaqus results file and asserted against directly. 
+
+There are times when this is limiting and some combination of Abaqus quantities is more convenient to
+be asserted against. If the results type specifies only a single a single history object then an *evalStatement*
+key may be specified within the results specifier dictionary. If there results type specifies an x and y history
+identifier then two separate evalStatements ( *xEvalStatement* and *yEvalStatement* ). 
+
+An eval statement is generally an arithmetic combination of results history objects. An eval
+statement is a string where previously defined history objects maybe referenced (via there assigned *label* key).
+An example of an eval statement is given below:
+
+```
+    "evalStatement": "(d['n1_U1'] + d['n2_U1']) / 10.0"
+```
+
+In the example above, *n1_U1* and *n2_U2* would be identifying dictionaries with those very labels (labels should
+therefore be unique) which are summed and then divided by 10.0.  
+
+NOTE: To access a result defined in an identifier object the general syntax is d[<label>]. This is because
+internally a dictionary of results (d) is created where label is made to be key. Therefore, to access the data
+in the dictionary d one must use the python syntax to do so (d[<label>]).
+
+#### Tabular Example Using Eval Statement
+
+The tabular example by default uses the two identifier dict objects to define x and y data respectively (which is thusly compared to a
+list of tuples specified as referenceValue). Additionally, a more advanced usage is allowed within the tabular option to specify a pythonic statement for combinging
+multiple identifier results into a set of x values (and y values). This is best seen by way of example:
+
+```
+    length = 10
+    area = 100
+    ...
+    "results": [
+        {
+            "type": "tabular",
+            "identifier": [
+                {   "label": "x1",
+                    "symbol": "U2",
+                    "nset": "LOADAPP"
+                },
+                {   "label": "x2",
+                    "symbol": "U2",
+                    "position": "Node 4",
+                    "nset": "LOADFOLLOWERS"
+                },
+                {   "label": "y",
+                    "symbol": "RF2",
+                    "nset": "LOADAPP"
+                }
+            ],
+            # Use eval statements to calculate a reference strain and stress val from abaqus output of force and disp
+            "xEvalStatement": "(d['x1'] + d['x2']) / (2 * {length})".format(length=length),
+            "yEvalStatement": "d['y']/ {area}".format(area=area),
+            "referenceValue": [
+                            (0.0, 0.0), 
+                            (0.000582908, 1.49516), 
+                            (0.000944326, 2.4222), 
+                            (0.00138836, 3.56113)
+                            ],
+            "tolerance": (0.0001, 0.350)
+        }
+    ]
+```
+
+In the example above *label*s are given to identifier dictionaries (for subsequent use in evaluation statements). 
+Then a *xEvalStatement* and *yEvalStatement* is provided which can be any pythonic evaluatable expression (generally,
+some combination of the xy history results specified by the labeled identifier objects). In this example, two displacements
+are extracted from the odb (labeled *x1* and *x2*). They are averaged together and then normalized by some length to determine 
+a reference strain value. Because this combination is defined in the *xEvalStatement* these points will become the basis for
+the x's. Similarly y points are defined by normalizing force by area for reference stress determination. After
+the definition of x and y points through eval statements the comparison for test is identical to the
+default tabular implementation (comparison to referenceValue within specified tolerance). 
 
 ## Automatic testing
 Abaverify has the capability to run a series of tests, generate a report, and plot run times against historical run times. See `automatic.py` and `automatic_testing_script.py` for details.
