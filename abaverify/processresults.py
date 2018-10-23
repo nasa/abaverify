@@ -345,8 +345,10 @@ def evaluate_statement(identifier_list, var_names, eval_statement):
     assert all([label_name in ident for ident in identifier_list]), label_missing_err_message
     # Build local variable d (maps label -> corresponding data
     d = {}
-    for (ident, var_name) in zip(identifier_list, var_names):
-        data = session.XYDataFromHistory(name=str(ident[symbol_name]), odb=odb,
+    for loop_index, (ident, var_name) in enumerate(zip(identifier_list, var_names)):
+        # Create a disambiguated name so that if the same ident is used (we don't have xydata objects with same name...one will be overwritten)
+        disambiguated_name = "{}_{}".format(ident[symbol_name], loop_index)
+        data = session.XYDataFromHistory(name=disambiguated_name, odb=odb,
                                       outputVariableName=var_name,
                                       steps=steps)
         d[ident[label_name]] = data
