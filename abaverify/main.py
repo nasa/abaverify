@@ -310,6 +310,8 @@ class TestCase(unittest.TestCase):
                 self._runModel(jobName=jobName, logFileHandle=f, timer=timer)
 
             # Execute process_results script load ODB and get results
+            if options.verbose:
+                print "Running post processing script ..."
             if options.host == "localhost":
                 if not os.path.isfile(os.path.join(os.getcwd(), 'testOutput', jobName + '.odb')):
                     raise Exception("Error: Abaqus odb was not generated. Check the log file in the testOutput directory.")
@@ -410,13 +412,6 @@ class TestCase(unittest.TestCase):
         cmd += ' interactive'
         if options.verbose:
             print "Abaqus command: " + cmd
-
-        # Copy parameters file, if it exists
-        if options.host == "localhost":
-            parameterName = 'CompDam.parameters'
-            parameterPath = os.path.join(os.getcwd(), parameterName)
-            if os.path.exists(parameterPath):
-                shutil.copyfile(parameterPath, os.path.join(os.getcwd(), 'testOutput', parameterName))
 
         # Run the test from the testOutput directory
         if options.host == "localhost":
