@@ -272,10 +272,10 @@ class TestCase(unittest.TestCase):
         Removes Abaqus temp files. This function is called by unittest.
         """
         files = os.listdir(os.getcwd())
-        patterns = [re.compile('.*abaqus.*\.rpy.*'), re.compile('.*abaqus.*\.rec.*'), re.compile('.*pyc')]
+        patterns = [re.compile(r'.*abaqus.*\.rpy.*'), re.compile(r'.*abaqus.*\.rec.*'), re.compile(r'.*pyc')]
         [os.remove(f) for f in files if any(regex.match(f) for regex in patterns)]
 
-    def runTest(self, jobName):
+    def runTest(self, jobName, func=None, arguments=None):
         """
         Run a verification test.
 
@@ -290,6 +290,11 @@ class TestCase(unittest.TestCase):
             The name of the abaqus input deck (without the .inp file extension). 
             Abaverify assumes that there is a corresponding file named 
             <jobName>_expected.py that defines the expected results.
+        func : function
+            A function to evaluate external assertions. The function is passed
+            self and jobName as arguments.
+        arguments : list
+            A list of arguments to pass to the func
 
         """
 
@@ -342,7 +347,7 @@ class TestCase(unittest.TestCase):
                     ftp.close()
 
         # Run assertions
-        self._runAssertionsOnResults(jobName)
+        self._runAssertionsOnResults(jobName, func, arguments)
 
     def _runModel(self, jobName, logFileHandle, timer):
         """
@@ -421,7 +426,7 @@ class TestCase(unittest.TestCase):
         else:
             _callAbaqusOnRemote(cmd=cmd, log=logFileHandle, timer=timer)
 
-    def _runAssertionsOnResults(self, jobName):
+    def _runAssertionsOnResults(self, jobName, func, arguments):
         """
         Runs assertions on each result specified in the <jobName>_results.py file.
 
@@ -433,55 +438,63 @@ class TestCase(unittest.TestCase):
         ----------
         jobName : :obj:`str`
             The name of the abaqus input deck (without the .inp file extension).
+        func : function
+            A function to evaluate external assertions. The function is passed
+            self and jobName as arguments.
+        arguments : list
+            A list of arguments to pass to the func
 
         """
 
         outputFileName = jobName + '_results.py'
         outputFileDir = os.path.join(os.getcwd(), 'testOutput')
         outputFilePath = os.path.join(outputFileDir, outputFileName)
-        if os.path.isfile(outputFilePath):
-            sys.path.insert(0, outputFileDir)
-            results = __import__(outputFileName[:-3]).results
-
-            for r in results:
-
-                # Loop through values if there are more than one
-                if hasattr(r['computedValue'], '__iter__'):
-                    for i in range(0, len(r['computedValue'])):
-                        computed_val = r['computedValue'][i]
-                        reference_val = r['referenceValue'][i]
-
-                        if isinstance(reference_val, tuple):
-                            tolerance_for_result_obj = r['tolerance']
-                            # when there exists a tuple as a reference val then all other results and deltas
-                            # should also be tuples
-                            self.assertEqual(len(computed_val), len(reference_val),
-                                             "Specified reference value should be same length as Computed value")
-                            # tolerance may be specified as a single tuple or a list of tuples. If its the latter
-                            # then index and return the tuple
-                            if isinstance(tolerance_for_result_obj, tuple):
-                                tolerance = tolerance_for_result_obj
-                            else:
-                                tolerance = tolerance_for_result_obj[i]
-                            self.assertEqual(len(reference_val), len(tolerance),
-                                             "Specified tolerance tople should be the same length as the ref")
-                            # loop through entries in tuple (x and y)
-                            for (cv, rv, tolerance) in zip(computed_val, reference_val, tolerance):
-                                self.assertAlmostEqual(cv, rv, delta=tolerance)
-                        else:
-                            tolerance_for_result_obj = r['tolerance'][i]
-                            self.assertAlmostEqual(computed_val, reference_val, delta=tolerance_for_result_obj)
-
-                else:
-                    if "tolerance" in r:
-                        self.assertAlmostEqual(r['computedValue'], r['referenceValue'], delta=r['tolerance'])
-                    elif "referenceValue" in r:
-                        self.assertEqual(r['computedValue'], r['referenceValue'])
-                    else:
-                        # No data to compare with, so pass the test
-                        pass
+        if func:
+            func(self, jobName, arguments)
         else:
-            self.fail('No results file provided by process_results.py. Looking for "%s"' % outputFilePath)
+            if os.path.isfile(outputFilePath):
+                sys.path.insert(0, outputFileDir)
+                results = __import__(outputFileName[:-3]).results
+
+                for r in results:
+
+                    # Loop through values if there are more than one
+                    if hasattr(r['computedValue'], '__iter__'):
+                        for i in range(0, len(r['computedValue'])):
+                            computed_val = r['computedValue'][i]
+                            reference_val = r['referenceValue'][i]
+
+                            if isinstance(reference_val, tuple):
+                                tolerance_for_result_obj = r['tolerance']
+                                # when there exists a tuple as a reference val then all other results and deltas
+                                # should also be tuples
+                                self.assertEqual(len(computed_val), len(reference_val),
+                                                 "Specified reference value should be same length as Computed value")
+                                # tolerance may be specified as a single tuple or a list of tuples. If its the latter
+                                # then index and return the tuple
+                                if isinstance(tolerance_for_result_obj, tuple):
+                                    tolerance = tolerance_for_result_obj
+                                else:
+                                    tolerance = tolerance_for_result_obj[i]
+                                self.assertEqual(len(reference_val), len(tolerance),
+                                                 "Specified tolerance tople should be the same length as the ref")
+                                # loop through entries in tuple (x and y)
+                                for (cv, rv, tolerance) in zip(computed_val, reference_val, tolerance):
+                                    self.assertAlmostEqual(cv, rv, delta=tolerance)
+                            else:
+                                tolerance_for_result_obj = r['tolerance'][i]
+                                self.assertAlmostEqual(computed_val, reference_val, delta=tolerance_for_result_obj)
+
+                    else:
+                        if "tolerance" in r:
+                            self.assertAlmostEqual(r['computedValue'], r['referenceValue'], delta=r['tolerance'])
+                        elif "referenceValue" in r:
+                            self.assertEqual(r['computedValue'], r['referenceValue'])
+                        else:
+                            # No data to compare with, so pass the test
+                            pass
+            else:
+                self.fail('No results file provided by process_results.py. Looking for "%s"' % outputFilePath)
 
 
 class ParametricMetaClass(type):
@@ -609,7 +622,7 @@ class ParametricMetaClass(type):
                                 ftp.close()
 
                     # Run assertions
-                    self._runAssertionsOnResults(jobName)
+                    self._runAssertionsOnResults(jobName, None, None)
 
                 finally:  # Make sure temporary files are removed
                     os.remove(jobName + '.inp')  # Delete temporary parametric input file
@@ -972,7 +985,7 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
         if not options.useExistingResults:
             if not options.keepExistingOutputFile:
                 testOutputPath = os.path.join(os.getcwd(), 'testOutput')
-                pattern = re.compile('.*\.env$')
+                pattern = re.compile(r'.*\.env$|__pycache__')
                 for f in os.listdir(testOutputPath):
                     if not pattern.match(f):
                         os.remove(os.path.join(os.getcwd(), 'testOutput', f))

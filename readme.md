@@ -243,5 +243,8 @@ the x's. Similarly y points are defined by normalizing force by area for referen
 the definition of x and y points through eval statements the comparison for test is identical to the
 default tabular implementation (comparison to referenceValue within specified tolerance). 
 
+## Custom assertions in the test_runner.py file
+User-defined assertions can be added without modifying the abaverify code as follows. Optional arguments `func` and `arguments` are provided in the `self.runTest()` function call. `func` is a python function that receives three positional arguments: the abaverify object, the jobname, and the object passed to `arguments`. The user-defined code in `func` may implement any logic necessary and then use the abaverify object to make the necessary assertions.
+
 ## Automatic testing
 Abaverify has the capability to run a series of tests, generate a report, and plot run times against historical run times. See `automatic.py` and `automatic_testing_script.py` for details.
