@@ -16,6 +16,7 @@ import inspect
 import getpass
 import datetime
 import pprint
+from threading import Timer
 
 #
 # Local
@@ -101,6 +102,22 @@ def _versiontuple(v):
     """
 
     return tuple(map(int, (v.split("."))))
+
+
+def _terminate_job(jobName, abaqusCmd, logFileHandle):
+    """
+    Terminates an abaqus job
+
+    Parameters
+    ----------
+    jobName : :obj:`str`
+        The name of the abaqus input deck (without the .inp file extension).
+    logFileHandle : :obj:`file`
+        A file handle to the file used for storing output.
+    """
+
+    logFileHandle.write("\n\n\nABAVERIFY INTERUPT: Job expiration time reached; terminating the analysis.\n\n\n")
+    subprocess.call([abaqusCmd, 'job=' + jobName, 'terminate'], shell=True)
 
 
 def _callAbaqus(cmd, log, timer=None, shell=True):
@@ -310,9 +327,16 @@ class TestCase(unittest.TestCase):
             else:
                 timer = None
 
+            # Check for job-specific expiration time
+            para = __import__(jobName + '_expected').parameters
+            if "expiration" in para:
+                options.expiration = para["expiration"]
+            if options.expiration < 0:
+                options.expiration = None
+
             # Execute the solver
             if not options.useExistingResults:
-                self._runModel(jobName=jobName, logFileHandle=f, timer=timer)
+                self._runModel(jobName=jobName, logFileHandle=f, timer=timer, expiration=options.expiration)
 
             # Execute process_results script load ODB and get results
             if options.verbose:
@@ -349,7 +373,7 @@ class TestCase(unittest.TestCase):
         # Run assertions
         self._runAssertionsOnResults(jobName, func, arguments)
 
-    def _runModel(self, jobName, logFileHandle, timer):
+    def _runModel(self, jobName, logFileHandle, timer, expiration=None):
         """
         Submits the abaqus job.
 
@@ -365,6 +389,8 @@ class TestCase(unittest.TestCase):
             A file handle to the file used for storing output.
         timer : :obj:`_measureRunTimes`
             An instance of `_measureRunTimes` to use for recording run times.
+        expiration : int
+            Time in seconds after which the test should 'expire' i.e. be killed.
 
         """
 
@@ -421,7 +447,12 @@ class TestCase(unittest.TestCase):
         # Run the test from the testOutput directory
         if options.host == "localhost":
             os.chdir(os.path.join(os.getcwd(), 'testOutput'))
+            if expiration:
+                exp = Timer(expiration, _terminate_job, [jobName, options.abaqusCmd, logFileHandle])
+                exp.start()
             _callAbaqus(cmd=cmd, log=logFileHandle, timer=timer)
+            if expiration:
+                exp.cancel()
             os.chdir(os.pardir)
         else:
             _callAbaqusOnRemote(cmd=cmd, log=logFileHandle, timer=timer)
@@ -587,9 +618,16 @@ class ParametricMetaClass(type):
                         else:
                             timer = None
 
+                        # Check for job-specific expiration time
+                        para = __import__(jobName + '_expected').parameters
+                        if "expiration" in para:
+                            options.expiration = para["expiration"]
+                        if options.expiration < 0:
+                            options.expiration = None
+
                         # Execute the solver
                         if not options.useExistingResults:
-                            self._runModel(jobName=jobName, logFileHandle=f, timer=timer)
+                            self._runModel(jobName=jobName, logFileHandle=f, timer=timer, expiration=options.expiration)
 
                         # Execute process_results script load ODB and get results
                         if options.host == "localhost":
@@ -720,6 +758,7 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
     parser.add_option("-V", "--verbose", action="store_true", dest="verbose", default=False, help="Print information for debugging")
     parser.add_option("-d", "--double", action="store_true", dest="double", default=False, help="Run with double precision (double=both)")
     parser.add_option("-n", "--doNotSaveODB", action="store_true", dest="doNotSave", default=False, help="Does not save x-y data to the ODB")
+    parser.add_option("-x", "--expiration", action="store", type="int", default=-1, help="Time in seconds to allow jobs to run before killing them. Defaults to -1 for no time limit.")
     (options, args) = parser.parse_args()
 
     # Remove custom args so they do not get sent to unittest

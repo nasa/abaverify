@@ -150,6 +150,7 @@ tests $  python test_runner.py -R username@server.sample.com
 tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 --time
 ```
 - `-V` or `--verbose` can be specified to print the Abaqus log data to the terminal.
+- `-x` or `--expiration` can be specified to set a duration (in seconds) after which the job is killed to prevent long running jobs that may occur as a result of an error in the subroutine. A job-specific expiration can be set by adding `"expiration": <time in seconds>` to the parameters dictionary in a `*_expected.py` file.
 
 
 ## Results `type`
