@@ -6,10 +6,13 @@ Arguments
     jobName: 
         name of the abaqus job (code expects an odb and a results text file with this name
         in the working dir)
+    readOnly:
+        boolean that specifies whether xy data is saved to the odb
 
 Example
 -------
-$ abaqus cae noGUI=model_runner.py -- jobName
+Running a test model from the abaverify/tests/tests/testOutput directory:
+$ abaqus cae script=../../../abaverify/processresults.py -- <jobName> True
 
 Returns
 -------
@@ -193,8 +196,8 @@ def historyOutputNameFromIdentifier(identifier, steps=None):
 
 
     Accepted identifier formats:
-    # Specify the complete identifier
-    - "identifier": "Reaction force: RF1 at Node 9 in NSET LOADAPP"
+    # Specify the complete identifier (for model wide outputs only)
+    - "identifier": "symbol": "Internal energy: ALLIE for Whole Model"
     # Specify the complete identifier piecemeal
     - "identifier": {
                 "symbol": "RF1",
@@ -364,7 +367,13 @@ def getX(r, varNames):
                                eval_statement=r[xEvalStatement])
     else:
         # Get xy data (positionally)
-        x = session.XYDataFromHistory(name=str(r[identifier_name][0][symbol_name]), odb=odb,
+        if isinstance(r[identifier_name][0], (dict, list)):
+            name = str(r[identifier_name][0][symbol_name])
+        elif isinstance(r[identifier_name][0], str):
+            name = r[identifier_name]
+        else:
+            raise ValueError('Unexpected type received for identifier.')
+        x = session.XYDataFromHistory(name=name, odb=odb,
                                       outputVariableName=varNames[0],
                                       steps=steps)
     return x
@@ -377,7 +386,13 @@ def getY(r, varNames):
                                eval_statement=r[yEvalStatement])
     else:
         # Get xy data (positionally)
-        y = session.XYDataFromHistory(name=str(r[identifier_name][1][symbol_name]), odb=odb,
+        if isinstance(r[identifier_name][1], (dict, list)):
+            name = str(r[identifier_name][1][symbol_name])
+        elif isinstance(r[identifier_name][1], str):
+            name = r[identifier_name]
+        else:
+            raise ValueError('Unexpected type received for identifier.')
+        y = session.XYDataFromHistory(name=name, odb=odb,
                                       outputVariableName=varNames[1],
                                       steps=steps)
     return y
@@ -416,6 +431,9 @@ debug(os.getcwd())
 jobName = sys.argv[-2]
 readOnly = sys.argv[-1] == 'True'
 
+debug('Loading job: {0}'.format(jobName))
+debug('Read only: {0}'.format(readOnly))
+
 # Load parameters
 para = __import__(jobName + '_expected').parameters
 
@@ -452,11 +470,18 @@ testResults = list()
 # Collect results
 for iii, r in enumerate(para[results_name]):
 
-    # Get the steps to consider. Default to "Step-1"
+    # Get the steps to consider. Default to all steps.
     if "step" in r:
         steps = (str(r["step"]), )
     else:
-        steps = ("Step-1", )
+        steps = tuple(odb.steps.keys())
+
+    # Tolerance as a percentage
+    if "tolerance_percentage" in r:
+        if isinstance(r["referenceValue"], list):
+            r["tolerance"] = [(pt[0]*r["tolerance_percentage"], pt[1]*r["tolerance_percentage"]) for pt in r["referenceValue"]]
+        else:
+            r["tolerance"] = r["referenceValue"] * r["tolerance_percentage"]
 
     # Debugging
     debug(steps)
@@ -478,7 +503,13 @@ for iii, r in enumerate(para[results_name]):
                                     eval_statement=r[evalStatement])
         else:
             debug("evalStatement not found")
-            n = str(r[identifier_name][symbol_name]) + '_' + steps[0] + '_' + str(r[type_name])
+            if isinstance(r[identifier_name], (dict, list)):
+                prefix = str(r[identifier_name][symbol_name])
+            elif isinstance(r[identifier_name], str):
+                prefix = r[identifier_name]
+            else:
+                raise ValueError('Unexpected type received for identifier.')
+            n = prefix + '_' + steps[0] + '_' + str(r[type_name])
             xyDataObj = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varName, steps=steps)
             xy = session.xyDataObjects[n]
         # odb.userData.XYData(n, xy)
@@ -733,7 +764,13 @@ for iii, r in enumerate(para[results_name]):
             xy = evaluate_statement(identifier_list=identifier_list, var_names=[varName],
                                     eval_statement=r[evalStatement])
         else:
-            n = str(r[identifier_name][symbol_name]) + '_' + steps[0] + '_' + str(r[type_name])
+            if isinstance(r[identifier_name], (dict, list)):
+                prefix = str(r[identifier_name][symbol_name])
+            elif isinstance(r[identifier_name], str):
+                prefix = r[identifier_name]
+            else:
+                raise ValueError('Unexpected type received for identifier.')
+            n = prefix + '_' + steps[0] + '_' + str(r[type_name])
             xyDataObj = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varName, steps=steps)
             xy = session.xyDataObjects[n]
 
@@ -771,16 +808,28 @@ for iii, r in enumerate(para[results_name]):
     elif r[type_name] == results_tabular:
         varNames = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
+        if isinstance(varNames, str): # Allows for tabular comparison with x as time
+            if isinstance(r[identifier_name], (dict, list)):
+                prefix = str(r[identifier_name][symbol_name])
+            elif isinstance(r[identifier_name], str):
+                prefix = r[identifier_name]
+            else:
+                raise ValueError('Unexpected type received for identifier.')
+            n = prefix + '_' + steps[0] + '_' + str(r[type_name])
+            debug('n: '+n)
+            xyDataObj = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varNames, steps=steps)
+            xy = session.xyDataObjects[n]
 
-        x, y = getXY(r, varNames)
+        else:
+            x, y = getXY(r, varNames)
 
-        # Combine the x and y data
-        xy = combine(x, y)
-        tmpName = xy.name
-        xy_data_name = 'ld{}'.format(iii)
-        session.xyDataObjects.changeKey(tmpName, xy_data_name)
-        xy = session.xyDataObjects[xy_data_name]
-        odb.userData.XYData(xy_data_name, xy)
+            # Combine the x and y data
+            xy = combine(x, y)
+            tmpName = xy.name
+            xy_data_name = 'ld{}'.format(iii)
+            session.xyDataObjects.changeKey(tmpName, xy_data_name)
+            xy = session.xyDataObjects[xy_data_name]
+            odb.userData.XYData(xy_data_name, xy)
 
         xy_np = np.asarray(xy)
         x = xy_np[:, 0]

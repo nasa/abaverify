@@ -79,7 +79,7 @@ parameters = {
             # More complicated case to find the slope of the stress strain curve within the interval 0.0001 < x < 0.005
             {
                 "type": "slope",
-                "step": "Step-1",                                   # By default the step is assumed to be the first step. Can specify any step with the step name
+                "step": "Step-1",                                   # By default all steps are used. You can specify any step with the step name
                 "identifier": [                                     # The identifier here is an array since we are looking for the slope of a curve defined by x and y
                     { # x
                         "symbol": "LE11",

@@ -290,7 +290,10 @@ class TestCase(unittest.TestCase):
         """
         files = os.listdir(os.getcwd())
         patterns = [re.compile(r'.*abaqus.*\.rpy.*'), re.compile(r'.*abaqus.*\.rec.*'), re.compile(r'.*pyc')]
-        [os.remove(f) for f in files if any(regex.match(f) for regex in patterns)]
+        try:
+            [os.remove(f) for f in files if any(regex.match(f) for regex in patterns)]
+        except:
+            pass
 
     def runTest(self, jobName, func=None, arguments=None):
         """
@@ -1005,7 +1008,11 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
         pattern = re.compile(r'^abaqus\.rpy(\.)*([0-9])*$')
         for f in os.listdir(testPath):
             if pattern.match(f):
-                os.remove(os.path.join(os.getcwd(), f))
+                try:
+                    os.remove(os.path.join(os.getcwd(), f))
+                except:
+                    if options.verbose:
+                        print "Unable to remove " + f + " skipping it"
 
         # Remove old binaries
         if not options.useExistingBinaries:
@@ -1027,7 +1034,11 @@ def runTests(relPathToUserSub, double=False, compileCodeFunc=None):
                 pattern = re.compile(r'.*\.env$|__pycache__')
                 for f in os.listdir(testOutputPath):
                     if not pattern.match(f):
-                        os.remove(os.path.join(os.getcwd(), 'testOutput', f))
+                        try:
+                            os.remove(os.path.join(os.getcwd(), 'testOutput', f))
+                        except:
+                            if options.verbose:
+                                print "Unable to remove " + f + " skipping it"
             else:
                 # Check for files with the same name to avoid overwriting
                 # This is a bit of pain

@@ -21,6 +21,12 @@ parameters = {
                 },
             "referenceValue": 0,
             "tolerance": 0.1
+        },
+        {
+            "type": "max",
+            "identifier": "Stress components: S22 at Element 1 Int Point 1 in ELSET ALL",
+            "referenceValue": 0,
+            "tolerance": 0.1
         }
     ]
 }
