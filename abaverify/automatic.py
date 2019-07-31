@@ -158,6 +158,7 @@ class Automatic():
 
         # Log parsing data
         self.verbose = verbose
+        self.verbose_parse_log = ''
 
         # List of tests to run [default is an empty list, in which case all
         # tests are run]
@@ -260,6 +261,13 @@ class Automatic():
             json.dump(self.test_report.getDict(), outfile)
         if self.verbose:
             _logVerbose("Archived test report at: " + trpath)
+
+        # Parsing log
+        if self.verbose:
+            parseing_log_name = os.path.join(self.archive_directory,
+                self.base_file_name + '.log')
+            with open(parseing_log_name, 'w+') as f:
+                f.write(self.verbose_parse_log)
 
         # zip job files and copy to the archive directory
         zipf = zipfile.ZipFile(self.base_file_name +
@@ -465,13 +473,13 @@ class Automatic():
         # Match 'ok'
         if re.match(r'.*ok$', line):
             if self.verbose:
-                _logParsing("MATCHED", line)
+                self.verbose_parse_log += _logParsing("MATCHED", line)
             self.test_report.setTestResult(True)
 
         # Match 'fail'
         elif re.match(r'.*FAIL$', line):
             if self.verbose:
-                _logParsing("MATCHED", line)
+                self.verbose_parse_log += _logParsing("MATCHED", line)
             self.test_report.setTestResult(False)
 
         # Match lines starting with test_
@@ -479,21 +487,21 @@ class Automatic():
         elif re.match(r'^test_.*', line):
             if '...' in line:
                 if self.verbose:
-                    _logParsing("MATCHED", line)
+                    self.verbose_parse_log += _logParsing("MATCHED", line)
                 sl = line.split('...')
                 s2 = sl[0].split(' (')
                 self.test_report.addTestResult(s2[0])
 
             else:
                 if self.verbose:
-                    _logParsing("MATCHED", line)
+                    self.verbose_parse_log += _logParsing("MATCHED", line)
                 s2 = line.split(' (')
                 self.test_report.addTestResult(s2[0])
 
         # Match time:
         elif re.match(r'.*time:.*$', line):
             if self.verbose:
-                _logParsing("MATCHED", line)
+                self.verbose_parse_log += _logParsing("MATCHED", line)
             match = re.search(r'^([a-zA-Z]*)[\w ]*: ([0-9\.]*) s$', line)
             self.test_report.setRunTime(category=match.group(
                 1).lower(), duration=match.group(2))
@@ -509,17 +517,17 @@ class Automatic():
             match = re.search(r'FAILED \([a-z]*=([0-9]*)[, =a-z1-9]*\)$', line)
             if match:
                 if self.verbose:
-                    _logParsing("MATCHED", line)
+                    self.verbose_parse_log += _logParsing("MATCHED", line)
                 self.test_report.setSummaryFailed(int(match.group(1)))
             else:
                 if self.verbose:
-                    _logParsing("NOT MATCHED", line)
+                    self.verbose_parse_log += _logParsing("NOT MATCHED", line)
                 self.test_report.setSummaryFailed(-1)
 
         # Other lines
         else:
             if self.verbose:
-                _logParsing("NOT MATCHED", line)
+                self.verbose_parse_log += _logParsing("NOT MATCHED", line)
 
 
 #
@@ -830,8 +838,10 @@ def _outputStreamer(proc, stream='stdout'):
 
 
 def _logParsing(status, line):
-    print status + ": " + line
+    msg = status + ": " + line
+    print msg
     sys.stdout.flush()
+    return msg + '\n'
 
 
 def _logVerbose(data):
