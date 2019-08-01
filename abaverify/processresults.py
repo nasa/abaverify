@@ -34,6 +34,11 @@ Test types:
     point. The reference value and tolerance are specified as pairs corresponding to the x and y values [x, y].
     Numerical derivatives are calculated to find the inflection point. A Butterworth filter is used to smooth the data.
     It is possible that this test could produce erroneous results if the data is too noisy for the filter settings.
+3. xy_infl_pt_bilinear:
+    A variation of test type xy_infl_pt in which an x-y data set is split into two consecutive sets and linear curve fits are
+    performed on each. The sum of the residuals of the two fittings are summed, and the intersection of the best fitting pair is
+    defined as the inflection point. This test type performs well for piecewise linear histories which may include some higher
+    frequency vibrations. The xy history is resampled to prior to splitting so as to equally weight the summed errors.
 4. disp_at_zero_y:
     Records the displacement when the y-value reaches zero. This is useful for finding the maximum displacement in cohesive
     laws.
@@ -413,6 +418,7 @@ results_max = "max"
 results_min = "min"
 results_continous = "continuous"
 results_xy_infl_pt = "xy_infl_pt"
+results_xy_infl_pt_bilinear = "xy_infl_pt_bilinear"
 results_disp_at_zero_y = "disp_at_zero_y"
 results_log_stress_at_failure_init = "log_stress_at_failure_init"
 results_slope = "slope"
@@ -597,6 +603,64 @@ for iii, r in enumerate(para[results_name]):
         # Store the x, y pair at the inflection point
         x, y = zip(*session.xyDataObjects['windowed'])
         r[compute_value_name] = (xMax, interpolate(xMax, x, y))
+        testResults.append(r)
+
+    elif r[type_name] == results_xy_infl_pt_bilinear:
+        varNames = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
+
+        # Get xy data
+        x, y = getXY(r, varNames)
+        # Combine the x and y data
+        xy = combine(x, y)
+        tmpName = xy.name
+        session.xyDataObjects.changeKey(tmpName, 'ld')
+        xy = session.xyDataObjects['ld']
+        odb.userData.XYData('ld', xy)
+
+        # Locals
+        xyData = xy
+        windowMin = r["window"][0]
+        windowMax = r["window"][1]
+
+        # Select window
+        windowed = [xi for xi in xyData if xi[0] > windowMin and xi[0] < windowMax]
+        if len(windowed) == 0:
+            raise Exception("No points found in specified window")
+        if min([abs(windowed[i][0] - windowed[i - 1][0]) for i in range(1, len(windowed))]) == 0:
+            raise "ERROR"
+        session.XYData(data=windowed, name="windowed")
+        ldWindowed = session.xyDataObjects['windowed']
+        odb.userData.XYData('windowed', ldWindowed)
+
+        xy = resample(data=windowed, numPts=10000)
+        xn = np.array([x[0] for x in xy])
+        yn = np.array([x[1] for x in xy])
+
+        offset = 1
+        optimum = {"error":1e6}
+        # Split the xy data
+        for i in range(offset, len(xn) + 1 - offset):
+            # Perform the linear fit for each subset of the xy data
+        	p1 = np.polyfit(xn[0:i+1], yn[0:i+1], 1, full=True)
+        	p2 = np.polyfit(xn[i:], yn[i:], 1, full=True)
+
+        	error = np.sum(p1[1]) + np.sum(p2[1])
+            # Store the best fit
+        	if error < optimum["error"]:
+        		optimum["error"] = error
+        		optimum["p1"] = p1
+        		optimum["p2"] = p2
+
+        a, c = optimum["p1"][0]
+        b, d = optimum["p2"][0]
+        # Find the intersection of the two linear fits with the least error
+        if a == b:
+            raise ValueError("xy_infl_pt: Optimal fit of two segments are parallel.")
+        else:
+        	x0 = (d - c)/(a - b)
+        	y0 = a*(d - c)/(a - b) + c
+
+        r[compute_value_name] = (x0, y0)
         testResults.append(r)
 
     elif r[type_name] == results_disp_at_zero_y:
