@@ -19,6 +19,6 @@ setup(
     license="NASA Open Source Agreement Version 1.3",
     author="Andrew Bergan",
     author_email="andrew.c.bergan@nasa.gov",
-    install_requires=["paramiko", "plotly"],
+    install_requires=["plotly"],
     packages=["abaverify", ],
 )

@@ -1,5 +1,5 @@
 # abaverify
-A python package built on [`unittest`](https://docs.python.org/2.7/library/unittest.html) for running verification tests on Abaqus user subroutines. Basic familiarity with unittest and Abaqus user subroutine development is assumed in this readme.
+A python package built on [`unittest`](https://docs.python.org/3/library/unittest.html) for running verification tests on Abaqus 2024+ user subroutines. Basic familiarity with unittest and Abaqus user subroutine development is assumed in this readme.
 
 This software may be used, reproduced, and provided to others only as permitted under the terms of the agreement under which it was acquired from the U.S. Government. Neither title to, nor ownership of, the software is hereby transferred. This notice shall remain on all copies of the software.
 
@@ -10,7 +10,7 @@ For any questions, please contact the developers:
 - Frank Leone   | [frank.a.leone@nasa.gov](mailto:frank.a.leone@nasa.gov)     | (W) 757-864-3050
 
 ## Getting-Started
-This package assumes that you have `python 2.x` and `git` installed. This packaged is designed for Abaqus 2016 and it has been used successfully with v6.14; it may or may not work with older versions. It also assumes that you have an Abaqus user subroutine in a git repository with a minimum directory structure as shown here:
+This package assumes that you have `python 3.x` and `git` installed. This packaged is designed for Abaqus 2024+, which use Python 3. It can work with older versions of Abaqus, but issues may arise. It is possible to use for models without subroutines, but in general, the assumption is that you have an Abaqus user subroutine in a git repository with a minimum directory structure as shown here:
 ```
 repo_dir/
     .git/
@@ -39,8 +39,6 @@ $  pip install -e path/to/abaverifyDir
 ```
 
 That's it.
-
-If install fails with errors indicating an issue with `paramiko` or `cryptography`, see the [`paramiko` installation guide](http://www.paramiko.org/installing.html) for troubleshooting.
 
 The remainder of this section describes how to build your own tests using `abaverify` (e.g., what goes inside the `test_model1.inp`, `test_model1_expected.py`, and `test_runner.py`) files. For a working example, checkout the sample verification test in the `abaverify/tests/tests/` directory. You can run the sample test with the command `python test_runner.py` from the `abaverify/tests/tests/` directory. Note, the default environment file (`abaverify/tests/tests`) is formatted for windows; linux users will need to modify the default environment file to the linux format.
 
@@ -140,10 +138,6 @@ tests $  python test_runner.py SingleElementTests.test_C3D8R_simpleShear12 -C 4
 - `-i` or `--interactive` can be specified to print the Abaqus log data to the terminal.
 - `-n` or `--doNotSaveODB` can be used to disable saving of x-y data to the odb. This is sometimes helpful when debugging post processing scripts in conjunction with `-r`
 - `-r` or `--useExistingResults` can be specified to reuse the most recent test results. The net effect is that only the post-processing portion of the code is run, so you don't have to wait for the model to run just to debug a `_expected.py` file or `processresults.py`.
-- `-R` or `--remoteHost` can be specified to run the tests on a remote host, where the host information is passed as `user@server.com[:port][/path/to/run/dir]`. The default run directory is `<login_dir>/abaverify_temp/`. Looks for a file in the `tests/` directory called `abaverify_remote_options.py`, which can be used to set options for working with the remote server. An example of this file is available `abaverify/tests/tests/abaverify_remote_options.py`. Usage example:
-```
-tests $  python test_runner.py -R username@server.sample.com
-```
 - `-s` or equivalently `--specifyPathToSub` can be used to override the relative path to the user subroutine specified in the the call `abaverify.runTests()` in your `test_runner.py` file.
 - `-t` or `--time` can be specified to print the run times for the compiler, packager, and solver to the terminal. For example:
 ```

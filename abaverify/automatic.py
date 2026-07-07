@@ -27,10 +27,16 @@ import datetime as dt
 import plotly.offline as ply
 import plotly.graph_objs as plygo
 import smtplib
-from email.mime.text import MIMEText
-from email.MIMEBase import MIMEBase
-from email.mime.multipart import MIMEMultipart
-from email import Encoders
+
+emailing_enabled = False
+try:
+    from email.mime.text import MIMEText
+    # from email.MIMEBase import MIMEBase
+    from email.mime.multipart import MIMEMultipart
+    # from email import Encoders
+    emailing_enabled = True
+except:
+    pass
 
 import pprint
 pp = pprint.PrettyPrinter(indent=4)
@@ -76,6 +82,13 @@ class Automatic():
         Logs details of parsing files. Useful for debugging.
     tests_to_run : list
         Tests to run. Defaults to all tests in test_runner_file_name.
+    usub_lib_dir : str
+        Path to existing compiled binary files for subroutine. Set empty by default
+        so that fortran source is compiled. Equivalent to abaverify -e
+        --pathToBinaries "/Absolute/path/"
+    test_output_directory : str
+        Path to working directory for running tests. Equivalent to abaverify -o
+
     test_report : :obj:`TestReport`
         Test report instance.
     formatted_reports : dict
@@ -90,7 +103,8 @@ class Automatic():
     # Public API
     #
     def __init__(self, test_directory, archive_directory, repository=None, test_runner_file_name='test_runner.py',
-                 time_tests=True, precompile=False, cpus=1, force_tests=False, verbose=False, tests_to_run=[], abaqus_cmd='abaqus'):
+                 time_tests=True, precompile=False, cpus=1, force_tests=False, verbose=False, tests_to_run=[], 
+                 usub_lib_dir='', test_output_directory='testOutput', abaqus_cmd='abaqus', zip_results=False):
         """
         Creates an instance of Automatic.
 
@@ -131,6 +145,7 @@ class Automatic():
                 self.update_repo = True
         elif repository is None:
             self.repository_name = self._getRepoName()
+            self.repository_branch = ''
         else:
             raise ValueError(
                 "The argument repository for Automatic initialization must be a string or a dictionary.")
@@ -167,8 +182,16 @@ class Automatic():
                 "The argument tests_to_run for Automatic must be a list")
         self.tests_to_run = tests_to_run
 
+        # Path to precompiled binaries
+        self.usub_lib_dir = usub_lib_dir
+
+        # Path to working directory for abaqus jobs
+        self.test_output_directory = test_output_directory
+
         # Abaqus cmd (allows override to run a nondefault version of abaqus)
         self.abaqus_cmd = abaqus_cmd
+
+        self.zip_results = zip_results
 
         # ----------------------------------------------------------------------
         # Initialize a new test report
@@ -199,33 +222,13 @@ class Automatic():
 
         """
 
-        # Get the sha of the current commit
-        sha = subprocess.check_output(
-            "git rev-parse --short HEAD", shell=True).rstrip()
-        self.test_report.metaData['sha'] = sha
-
-        # Check if there are uncommitted changes
-        try:
-            subprocess.check_call('git diff --quiet', shell=True)
-            self.test_report.metaData['uncommited_changes'] = False
-        except Exception:
-            self.test_report.metaData['uncommited_changes'] = True
-            if self.verbose:
-                _logVerbose("Found uncommitted changes")
+        self._setBaseFileName()
 
         # Check if the current commit has been tested (and directory there are
         # no uncommitted changes)
         if not self.force_tests and _currentCommitTested(self.archive_directory, self.verbose):
-            print "No new commits"
+            print("No new commits")
             return False
-
-        # Get abaqus version
-        abq_version_response = subprocess.check_output(
-            self.abaqus_cmd + " information=release", shell=True)
-        self.abaqus_version = abq_version_response.split('\n')[1]
-        self.test_report.metaData['abaqus_version'] = self.abaqus_version
-        if self.verbose:
-            _logVerbose("Running on abaqus version: " + self.abaqus_version)
 
         # Build the command to run the tests
         cmd = ["python", self.test_runner_file_name,
@@ -235,7 +238,15 @@ class Automatic():
         if self.precompile:
             cmd.append("-c")
         if self.cpus > 1:
-            cmd.append("-C " + self.cpus)
+            cmd.append("--cpus")
+            cmd.append(str(self.cpus))
+        if len(self.usub_lib_dir):
+            cmd.append("-e")
+            cmd.append("--pathToBinaries")
+            cmd.append(self.usub_lib_dir)
+        if self.test_output_directory != 'testOutput':
+            cmd.append("--outputDirectory")
+            cmd.append(self.test_output_directory)
         if self.tests_to_run:
             cmd = cmd + self.tests_to_run
         if self.verbose:
@@ -248,11 +259,11 @@ class Automatic():
         for line in _outputStreamer(p):
             self._parseLine(line)
 
-        # Set file name
-        self.base_file_name = self.repository_name + \
-            '_' + sha + '_' + time.strftime("%Y-%b-%d")
-        if self.test_report.metaData['uncommited_changes']:
-            self.base_file_name = 'uc_' + self.base_file_name
+        # Copy any images from test output directory to archive directory
+        images = [f for f in os.listdir(self.test_output_directory) if f.endswith('.png')]
+        for image in images:
+            shutil.copy(os.path.join(self.test_output_directory, image),
+                        os.path.join(self.archive_directory, image))
 
         # Archive the report
         trpath = os.path.join(self.archive_directory,
@@ -270,19 +281,20 @@ class Automatic():
                 f.write(self.verbose_parse_log)
 
         # zip job files and copy to the archive directory
-        zipf = zipfile.ZipFile(self.base_file_name +
-                               ".zip", 'w', allowZip64=True)
-        _zipdir('testOutput', zipf)
-        zipf.close()
+        if self.zip_results:
+            zipf = zipfile.ZipFile(self.base_file_name +
+                                ".zip", 'w', allowZip64=True)
+            _zipdir('testOutput', zipf)
+            zipf.close()
 
-        # Move the archive to storage
-        shutil.move(self.base_file_name + ".zip",
-                    os.path.join(self.archive_directory, self.base_file_name + ".zip"))
+            # Move the archive to storage
+            shutil.move(self.base_file_name + ".zip",
+                        os.path.join(self.archive_directory, self.base_file_name + ".zip"))
 
         # Return the report obj
         return True
 
-    def generateReport(self, template):
+    def generateReport(self, template, failed_only=False, **kwargs):
         """
         Returns a report (string) containing the test results.
 
@@ -300,6 +312,10 @@ class Automatic():
             directory, the current directory, or somewhere else in the python 
             path. The template file should follow the pattern of the sample
             report template `template_email_summary`.
+        failed_only : :obj:`bool`, optional
+            If true, only include failed tests in the report. Default is false (include all tests).
+        kwargs : dict, optional
+            Additional keyword arguments to pass to the template.
 
         Returns
         -------
@@ -311,7 +327,7 @@ class Automatic():
         # Build the report
         ptat = os.path.join(self.archive_directory, self.base_file_name)
         rpt_str = _generateReport(
-            template=template, report=self.test_report, path_to_archived_tests=ptat)
+            template=template, report=self.test_report, failed_only=failed_only, **kwargs)
 
         # Name for report file
         saveAs = os.path.join(self.archive_directory,
@@ -324,11 +340,11 @@ class Automatic():
         return rpt_str
 
     @classmethod
-    def generateReport2(cls, template, report, saveAs):
+    def generateReport2(cls, template, report, saveAs, failed_only=False):
         """
         Static call to generateReport. Here for debugging purposes.
         """
-        rpt_str = _generateReport(template=template, report=report)
+        rpt_str = _generateReport(template=template, report=report, failed_only=failed_only)
         with open(saveAs, 'w') as outfile:
             outfile.write(rpt_str)
         return rpt_str
@@ -462,7 +478,7 @@ class Automatic():
 
     def _getRepoName(self):
         repo_path = subprocess.check_output(
-            "git rev-parse --show-toplevel", shell=True).strip()
+            "git rev-parse --show-toplevel", shell=True).strip().decode('utf-8')
         return repo_path.split('/').pop()
 
     def _parseLine(self, line):
@@ -502,7 +518,7 @@ class Automatic():
         elif re.match(r'.*time:.*$', line):
             if self.verbose:
                 self.verbose_parse_log += _logParsing("MATCHED", line)
-            match = re.search(r'^([a-zA-Z]*)[\w ]*: ([0-9\.]*) s$', line)
+            match = re.search(r'([a-zA-Z]*)[\w ]*: ([0-9\.]*) s$', line)
             self.test_report.setRunTime(category=match.group(
                 1).lower(), duration=match.group(2))
 
@@ -528,7 +544,70 @@ class Automatic():
         else:
             if self.verbose:
                 self.verbose_parse_log += _logParsing("NOT MATCHED", line)
+                self.test_report.not_matched_lines.append("NOT MATCHED: " + line)
 
+    def _setBaseFileName(self, name=None):
+        """
+        Set the base file name for the report and archive files.
+
+        The base file name is used for naming the report and archive files. It
+        is built using the repository name, the current git SHA, and the date.
+        If there are uncommitted changes, '_uc_' is added to the file name. The
+        abaqus version is also added to the file name.
+
+        """
+
+        if name:
+            self.base_file_name = name
+        else:
+            # Get the sha of the current commit
+            sha = subprocess.check_output(
+                "git rev-parse --short HEAD", shell=True).decode('utf-8').rstrip()
+            self.test_report.metaData['sha'] = sha
+
+            # Check if there are uncommitted changes
+            try:
+                subprocess.check_call('git diff --quiet', shell=True)
+                self.test_report.metaData['uncommited_changes'] = False
+            except Exception:
+                self.test_report.metaData['uncommited_changes'] = True
+                if self.verbose:
+                    _logVerbose("Found uncommitted changes")
+
+            # Get abaqus version
+            abq_version_response = subprocess.check_output(
+                self.abaqus_cmd + " information=release", shell=True).decode('utf-8')
+            self.abaqus_version = re.search(r"Abaqus [0-9].*", abq_version_response).group().strip()
+            self.test_report.metaData['abaqus_version'] = self.abaqus_version
+            if self.verbose:
+                _logVerbose("Running on abaqus version: " + self.abaqus_version)
+
+            # Set file name
+            self.base_file_name = "_".join([time.strftime("%Y-%b-%d"),
+                                            self.repository_name,
+                                            sha])
+            if self.test_report.metaData['uncommited_changes']:
+                self.base_file_name += '_uc'
+            abq_ver = self.test_report.metaData['abaqus_version'].split('.')[0].replace(' ', '_')
+            self.base_file_name += '_' + abq_ver
+
+            # Update archive directory to include the base file name
+            self.archive_directory = os.path.join(
+                self.archive_directory, self.base_file_name)
+            if not os.path.isdir(self.archive_directory):
+                os.makedirs(self.archive_directory)
+
+            # Add tests if not empty
+            if len(self.tests_to_run):
+                tests_str = "_".join(self.tests_to_run)
+                # Make sure it is not too long for a file name
+                if len(tests_str) > 50:
+                    tests_str = tests_str[:50] + '_etc'
+                self.base_file_name += '_' + tests_str
+
+            # Add number of cpus
+            if self.cpus>1:
+                self.base_file_name += f'_C{self.cpus}'
 
 #
 # Helper functions
@@ -541,7 +620,7 @@ def _currentCommitTested(archive_directory, verbose=False):
 
     # Get current SHA
     currentSHA = subprocess.check_output(
-        "git rev-parse --short HEAD", shell=True).strip()
+        "git rev-parse --short HEAD", shell=True).strip().decode('utf-8')
     if verbose:
         _logVerbose("Current SHA: {0}".format(currentSHA))
 
@@ -568,6 +647,18 @@ def _currentCommitTested(archive_directory, verbose=False):
             if verbose:
                 _logVerbose("Most recently tested SHA: {0}".format(
                     mostRecentTestResultsSHA))
+        if mostRecentTestResultsSHA == '':
+            match = re.search(
+                r'.*([a-zA-Z0-9]{7})_.*$', pathToMostRecent.split('/').pop())
+            if match:
+                if len(match.groups()) != 1:
+                    raise Exception(
+                        "Error parsing names in archive directory")
+
+                mostRecentTestResultsSHA = match.groups()[0]
+                if verbose:
+                    _logVerbose("Most recently tested SHA: {0}".format(
+                        mostRecentTestResultsSHA))
 
     # Compare SHAs
     if (currentSHA == mostRecentTestResultsSHA):
@@ -576,7 +667,7 @@ def _currentCommitTested(archive_directory, verbose=False):
         return False
 
 
-def _generateReport(template, report, path_to_archived_tests=""):
+def _generateReport(template, report, failed_only=False, **kwargs):
     """
     Return the template with the test report data substituted 
     """
@@ -592,18 +683,36 @@ def _generateReport(template, report, path_to_archived_tests=""):
     # Build string of test results
     test_result_formatted_str = ""
     for tr in report.test_results:
+        if failed_only and tr.test_status:
+            continue
         c = 'green' if tr.test_status else 'red'
         test_result_formatted_str += templ.test_result.format(test_name=tr.test_name, packager_time=tr.run_times['packager'],
                                                               solver_time=tr.run_times['solver'], status_color=c, status_text=tr.test_status)
 
-    # Build string for body
-    ntestspass = report.summary['number_tests'] - \
-        report.summary['number_failed']
-    body_formatted_str = templ.body.format(fqdn=socket.getfqdn(), path_to_archived_tests=path_to_archived_tests, git_sha=report.metaData['sha'], test_results=test_result_formatted_str,
-                                           number_of_tests_run=report.summary['number_tests'], total_duration=report.summary[
-                                               'duration'], num_tests_passed=ntestspass,
-                                           num_tests_failed=report.summary['number_failed'], abaqus_version=report.metaData['abaqus_version'])
+    # Total duration formatted nicely
+    duration = float(report.summary['duration'])
+    hours = int(duration // 3600)
+    minutes = int((duration % 3600) // 60)
+    total_duration_str = f"{hours:02d}:{minutes:02d} (hours:minutes)"
 
+    unmatched_lines = "<br>".join(report.not_matched_lines)
+    if unmatched_lines:
+        unmatched_lines = "<br><br><b>Lines that were not matched during parsing:</b><br>" + unmatched_lines
+
+    # Build string for body
+    ntestspass = report.summary['number_tests'] - report.summary['number_failed']
+    args = dict(fqdn=socket.getfqdn(),
+                git_sha=report.metaData['sha'],
+                test_results=test_result_formatted_str,
+                number_of_tests_run=report.summary['number_tests'],
+                total_duration=total_duration_str,
+                num_tests_passed=ntestspass,
+                num_tests_failed=report.summary['number_failed'],
+                abaqus_version=report.metaData['abaqus_version'],
+                not_matched_lines=unmatched_lines
+    )
+    args.update(kwargs)
+    body_formatted_str = templ.body.format(**args)
     return body_formatted_str
 
 
@@ -714,8 +823,9 @@ def _generateRunTimePlots(template, path_to_archived_tests, verbose=False):
         for chart_name in templ.chart_groups[chart_group_key]['charts']:
 
             if chart_name not in plotly_data_dict.keys():
-                raise ValueError(
-                    'The chart name {0} specified in the template file is not valid'.format(chart_name))
+                _logVerbose(
+                    'The chart name {0} specified in the template file is not valid. Skipped.'.format(chart_name))
+                continue
 
             # Generate plot html
             subsection_plots += _plotly_helper(template=templ, chart_name=chart_name,
@@ -777,39 +887,52 @@ def _emailResults(recipients, sender, body, attachments, repository_info):
     attachments = ['path_to_file', ]
     repository_info = {'name': , 'branch': }
     """
-
+    if not emailing_enabled:
+        print('Emailing not enabled, install email package')
+        return
     if type(recipients) is str:
         recipients = [recipients, ]
 
-    msg = MIMEMultipart('alternative')
+    # msg = MIMEMultipart('alternative')
+    from email.message import EmailMessage
+    msg = EmailMessage()
 
-    # Read the file containing the unittest output
-    with open(body, 'rb') as f:
-        html_body = MIMEText(f.read(), "html")
-        msg.attach(html_body)
+    # # Read the file containing the unittest output
+    # with open(body, 'rb') as f:
+    #     html_body = MIMEText(f.read(), "html")
+    #     msg.attach(html_body)
 
     # Setup the message
-    msg["from"] = sender
+    msg["From"] = sender
     msg["To"] = ", ".join(recipients)
-    msg["Subject"] = "[abaverify] Repository: " + \
-        repository_info['name'] + "; Branch: " + repository_info['branch']
+    if 'name' in repository_info and 'branch' in repository_info:
+        msg["Subject"] = "[abaverify] Repository: " + \
+            repository_info['name'] + "; Branch: " + repository_info['branch']
+    elif 'name' in repository_info:
+        msg["Subject"] = "[abaverify] Repository: " + repository_info['name']
+    else:
+        msg["Subject"] = "[abaverify] Repository: <no name>"
 
-    # Process attachments
-    for attachment in attachments:
-        with open(attachment, 'rb') as h:
-            file_attachment = MIMEBase('application', 'octect-stream')
-            file_attachment.set_payload(h.read())
-            Encoders.encode_base64(file_attachment)
-            file_attachment.add_header(
-                'Content-Disposition', 'attachment; filename=%s' % os.path.basename(attachment))
-            msg.attach(file_attachment)
+    msg.set_content("This is the body of the email. chief skier!!")
+
+    # # Process attachments
+    # for attachment in attachments:
+    #     with open(attachment, 'rb') as h:
+    #         file_attachment = MIMEBase('application', 'octect-stream')
+    #         file_attachment.set_payload(h.read())
+    #         Encoders.encode_base64(file_attachment)
+    #         file_attachment.add_header(
+    #             'Content-Disposition', 'attachment; filename=%s' % os.path.basename(attachment))
+    #         msg.attach(file_attachment)
 
     # Send
-    s = smtplib.SMTP('localhost')
-    try:
-        s.sendmail(sender, recipients, msg.as_string())
-    finally:
-        s.quit()
+    with smtplib.SMTP("localhost", 25) as smtp:
+        smtp.send_message(msg)
+    # s = smtplib.SMTP('localhost')
+    # try:
+    #     s.sendmail(sender, recipients, msg.as_string())
+    # finally:
+    #     s.quit()
 
 
 def _outputStreamer(proc, stream='stdout'):
@@ -839,7 +962,7 @@ def _outputStreamer(proc, stream='stdout'):
 
 def _logParsing(status, line):
     msg = status + ": " + line
-    print msg
+    print(msg)
     sys.stdout.flush()
     return msg + '\n'
 
@@ -887,6 +1010,7 @@ class TestReport():
         self.summary = dict()
         self.summary['number_tests'] = 0
         self.summary['number_failed'] = 0
+        self.not_matched_lines = list()
 
     @classmethod
     def fromArchivedResult(cls, pathToJSONFile):
@@ -915,7 +1039,7 @@ class TestReport():
         self.summary['duration'] = duration
 
         if len(self.test_results) != number_tests:
-            print "WARNING: Some tests not parsed correctly"
+            print("WARNING: Some tests not parsed correctly")
 
     def setSummaryFailed(self, number_tests):
         self.summary['number_failed'] = number_tests

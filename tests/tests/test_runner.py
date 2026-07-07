@@ -1,13 +1,10 @@
 import abaverify as av
 
 
-class ParametricTests(av.TestCase):
+class ParametricTests(av.TestCase, metaclass=av.ParametricMetaClass):
     """
     Simple example of parametric tests
     """
-
-    # Specify meta class
-    __metaclass__ = av.ParametricMetaClass
 
     # Refers to the template input file name
     baseName = "test_CPS4R_parametric"

@@ -6,21 +6,30 @@ test_result = """<tr>
 </tr>"""
 
 body = """
-<body>For more details, see the testOutput directory archive: <br>
-<font color='blue'>{fqdn}:{path_to_archived_tests}.zip</font><br><br>
-Git hash: {git_sha}
-<br><br>
-{abaqus_version}
-<br><br>
-Summary:<br>
-Number of tests that passed: {num_tests_passed} <br>
-Number of tests that failed: {num_tests_failed} <br>
-Ran {number_of_tests_run} tests in {total_duration}s<br>
+<body>
+<h3>Test configuration</h3>
+<ul style="margin-top:0;">
+  <li><b>Git hash:</b> {git_sha}</li>
+  <li><b>Abaqus version:</b> {abaqus_version}</li>
+  <li><b>Machine:</b> {fqdn}</li>
+</ul>
+
+<h3>Summary</h3>
+<ul style="margin-top:0;">
+  <li><b>Passed:</b> {num_tests_passed}</li>
+  <li><b>Failed:</b> {num_tests_failed}</li>
+  <li><b>Total:</b> {number_of_tests_run}</li>
+  <li><b>Total runtime:</b> {total_duration}</li>
+</ul>
+<br>
+{not_matched_lines}
+<br>
+{image_html}
 <br>
 <table border='1' cellpadding='3'>
 <tr><b>
     <td></td>
-    <td colspan='2' align='center'>Runing times</td>
+    <td colspan='2' align='center'>Running times</td>
     <td></td>
 </b></tr>
 <tr><b>

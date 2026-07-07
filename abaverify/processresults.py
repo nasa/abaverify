@@ -6,13 +6,15 @@ Arguments
     jobName: 
         name of the abaqus job (code expects an odb and a results text file with this name
         in the working dir)
+    outputDirectory:
+        directory where the output files are located
     readOnly:
         boolean that specifies whether xy data is saved to the odb
 
 Example
 -------
 Running a test model from the abaverify/tests/tests/testOutput directory:
-$ abaqus cae script=../../../abaverify/processresults.py -- <jobName> True
+$ abaqus cae script=../../../abaverify/processresults.py -- <jobName> testOutput True
 
 Returns
 -------
@@ -80,6 +82,31 @@ def debug(obj):
         sys.__stderr__.write("DEBUG - " + __name__ + ":  " + str(obj) + '\n')
 
 
+def make_monotonic(arr2d):
+    """
+    Filter 2D array so that it only includes rows that are monotonically
+    increasing or decreasing in col[0], depending on the difference between
+    the first and last value in col[0].
+    """
+    arr2d = np.asarray(arr2d)
+    if arr2d.shape[0] == 0:
+        return arr2d  # Return empty array if input is empty
+
+    # Determine direction
+    increasing = arr2d[-1, 0] >= arr2d[0, 0]
+
+    # Preallocate output array
+    result = np.empty_like(arr2d)
+    result[0] = arr2d[0]
+    j = 1  # index for result
+    for i in range(1, arr2d.shape[0]):
+        if (increasing and arr2d[i, 0] >= result[j - 1, 0]) or \
+           (not increasing and arr2d[i, 0] <= result[j - 1, 0]):
+            result[j] = arr2d[i]
+            j += 1
+    return result[:j]
+
+
 def interpolate(x, xp, fp):
     """
     Augmentation to np.interp to handle negative numbers. This is a hack, needs improvement.
@@ -106,6 +133,8 @@ def resample(data, numPts):
         xMin = x[-1]
         xMax = x[0]
     xNew = np.linspace(xMin, xMax, numPts)
+    # debug(x)
+    # debug(y)
     yNew = interpolate(xNew, x, y)
     return zip(xNew, yNew)
 
@@ -127,26 +156,40 @@ def parseJobName(name):
     """
     Parses job name of parametric tests
     """
+    
+    match = re.match(r"^(.*?)(?=(_[a-zA-Z]+_-?\d+p\d+)+$)", name)
+    if match:
+        basename = match.group(1)
+    else:
+        raise Exception("Failed to parse job name: " + name)
+    
+    # Extract key-value pairs
+    parameters = re.findall(r'([a-zA-Z]+)_(-?\d+p\d+)', name)
+    
+    # Format output
+    parameters = [(k, v.replace('p','.')) for k, v in parameters]
+    output = dict(parameters)
+    output["baseName"] = basename
 
-    s = name.split("_")
+    # s = name.split("_")
 
-    output = dict()
+    # output = dict()
 
-    # Find the index of the first integer (value of parameter)
-    idxFirstInt = 0
-    while True:
-        try:
-            int(s[idxFirstInt])
-            break
-        except ValueError:
-            idxFirstInt += 1
+    # # Find the index of the first integer (value of parameter)
+    # idxFirstInt = 0
+    # while True:
+    #     try:
+    #         int(s[idxFirstInt])
+    #         break
+    #     except ValueError:
+    #         idxFirstInt += 1
 
-    # Everything before the first integer is the basename
-    output["baseName"] = "_".join(s[0:idxFirstInt - 1])
+    # # Everything before the first integer is the basename
+    # output["baseName"] = "_".join(s[0:idxFirstInt - 1])
 
-    # Assume everything after the basename is parameters and values
-    for n in range(idxFirstInt - 1, len(s), 2):
-        output[s[n]] = s[n + 1]
+    # # Assume everything after the basename is parameters and values
+    # for n in range(idxFirstInt - 1, len(s), 2):
+    #     output[s[n]] = s[n + 1]
 
     return output
 
@@ -263,11 +306,14 @@ def historyOutputNameFromIdentifier(identifier, steps=None):
 
             else:
                 raise ValueError("Unrecognized symbol " + i + " found")
+        elif "identifier" in identifier:
+            return identifier["identifier"]
         else:
             raise ValueError("Identifier missing symbol definition")
 
     # Case when the identifer is specified directly
-    elif isinstance(identifier, (str, unicode)):
+    # elif isinstance(identifier, (str, unicode)):
+    elif isinstance(identifier, str):
         return str(identifier)
     else:
         raise ValueError("Expecting that the argument is a list, dict, or str. Found " + str(type(identifier)))
@@ -348,6 +394,7 @@ def evaluate_statement(identifier_list, var_names, eval_statement):
     :return: an xydata object returned by evaluating eval
     '''
 
+    var_names = var_names if type(var_names) in (tuple, list) else [var_names,]
     label_missing_err_message = "The identifiers specified in identifier_list must" \
                                 " all contain the label key. The following does not: {}".format(identifier_list)
     assert all([label_name in ident for ident in identifier_list]), label_missing_err_message
@@ -355,7 +402,7 @@ def evaluate_statement(identifier_list, var_names, eval_statement):
     d = {}
     for loop_index, (ident, var_name) in enumerate(zip(identifier_list, var_names)):
         # Create a disambiguated name so that if the same ident is used (we don't have xydata objects with same name...one will be overwritten)
-        disambiguated_name = "{}_{}".format(ident[symbol_name], loop_index)
+        disambiguated_name = "{}_{}".format(ident[label_name], loop_index)
         data = session.XYDataFromHistory(name=disambiguated_name, odb=odb,
                                       outputVariableName=var_name,
                                       steps=steps)
@@ -411,11 +458,13 @@ def getXY(r, varNames):
 type_name = "type"
 compute_value_name = "computedValue"
 reference_value_name = "referenceValue"
+compute_value_pct_err_name = "computedValuePctError"
 identifier_name = "identifier"
 symbol_name = "symbol"
 results_name = "results"
 results_max = "max"
 results_min = "min"
+results_length = "length"
 results_continous = "continuous"
 results_xy_infl_pt = "xy_infl_pt"
 results_xy_infl_pt_bilinear = "xy_infl_pt_bilinear"
@@ -431,21 +480,26 @@ xEvalStatement = "xEvalStatement"
 yEvalStatement = "yEvalStatement"
 evalStatement = "evalStatement"
 
-debug(os.getcwd())
+debug('Running in current directory :{}'.format(os.getcwd()))
 
 # Arguments
-jobName = sys.argv[-2]
+jobName = sys.argv[-3]
+outputDirectory = sys.argv[-2]
 readOnly = sys.argv[-1] == 'True'
 
 debug('Loading job: {0}'.format(jobName))
+debug('outputDirectory: {0}'.format(outputDirectory))
 debug('Read only: {0}'.format(readOnly))
 
 # Load parameters
 para = __import__(jobName + '_expected').parameters
 
-# Change working directory to testOutput and put a copy of the input file in testOutput
-if jobName + '.odb' not in os.listdir(os.getcwd()):
-    os.chdir(os.path.join(os.getcwd(), 'testOutput'))
+# Change working directory to outputDirectory
+outputDirectory = os.path.abspath(outputDirectory)
+if jobName + '.odb' in os.listdir(os.getcwd()):
+    debug('Using odb: '+os.path.join(os.getcwd(), jobName + '.odb'))
+else:
+    os.chdir(os.path.join(os.getcwd(), outputDirectory))
 
 # Load ODB
 odb = session.openOdb(name=os.path.join(os.getcwd(), jobName + '.odb'), readOnly=readOnly)
@@ -502,10 +556,10 @@ for iii, r in enumerate(para[results_name]):
         varName = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
         # Get the history data
-        identifier_list = [r[identifier_name]]
+        identifier_list = r[identifier_name] if isinstance(r[identifier_name], list) else [r[identifier_name]]
         if evalStatement in r:
             debug("evalStatement found")
-            xy = evaluate_statement(identifier_list=identifier_list, var_names=[varName],
+            xy = evaluate_statement(identifier_list=identifier_list, var_names=varName,
                                     eval_statement=r[evalStatement])
         else:
             debug("evalStatement not found")
@@ -520,11 +574,38 @@ for iii, r in enumerate(para[results_name]):
             xy = session.xyDataObjects[n]
         # odb.userData.XYData(n, xy)
 
+        # Filter
+        if "filterCutOffFreq" in r[identifier_name]:
+            xy = butterworthFilter(xyData=session.xyDataObjects[n], cutoffFrequency=int(r[identifier_name]["filterCutOffFreq"]))
+            tmpName = xy.name
+            session.xyDataObjects.changeKey(tmpName, n+'_filt')
+            xy = session.xyDataObjects[n+'_filt']
+
         # Get the value calculated in the analysis (last frame must equal to 1, which is total step time)
         if r[type_name] == results_max:
             r[compute_value_name] = max([pt[1] for pt in xy])
         else:
             r[compute_value_name] = min([pt[1] for pt in xy])
+        testResults.append(r)
+    
+    elif r[type_name] == results_length:
+
+        # This tries to automatically determine the appropriate position specifier
+        varName = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
+
+        # Get the history data
+        if isinstance(r[identifier_name], (dict, list)):
+            prefix = str(r[identifier_name][symbol_name])
+        elif isinstance(r[identifier_name], str):
+            prefix = r[identifier_name]
+        else:
+            raise ValueError('Unexpected type received for identifier.')
+        n = prefix + '_' + steps[0] + '_' + str(r[type_name])
+        xyDataObj = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varName, steps=steps)
+        xy = session.xyDataObjects[n]
+
+        # Get the value calculated in the analysis (last frame must equal to 1, which is total step time)
+        r[compute_value_name] = len(xy)
         testResults.append(r)
 
     # Enforce continuity
@@ -565,9 +646,11 @@ for iii, r in enumerate(para[results_name]):
         # Select window
         windowed = [xi for xi in xyData if xi[0] > windowMin and xi[0] < windowMax]
         if len(windowed) == 0:
+            debug(f"windowMin {windowMin}, windowMax {windowMax}")
             raise Exception("No points found in specified window")
         if min([abs(windowed[i][0] - windowed[i - 1][0]) for i in range(1, len(windowed))]) == 0:
             raise "ERROR"
+        windowed = make_monotonic(windowed)
         session.XYData(data=windowed, name="windowed")
         ldWindowed = session.xyDataObjects['windowed']
         odb.userData.XYData('windowed', ldWindowed)
@@ -583,7 +666,7 @@ for iii, r in enumerate(para[results_name]):
             tmpName = xy.name
             session.xyDataObjects.changeKey(tmpName, 'slope')
         else:
-            session.XYData(data=xy, name=results_slope)
+            session.XYData(data=np.array([x for x in xy]), name=results_slope)
         slopeXYObj = session.xyDataObjects['slope']
         odb.userData.XYData('slope', slopeXYObj)
 
@@ -628,28 +711,30 @@ for iii, r in enumerate(para[results_name]):
             raise Exception("No points found in specified window")
         if min([abs(windowed[i][0] - windowed[i - 1][0]) for i in range(1, len(windowed))]) == 0:
             raise "ERROR"
+        windowed = make_monotonic(windowed)
         session.XYData(data=windowed, name="windowed")
         ldWindowed = session.xyDataObjects['windowed']
         odb.userData.XYData('windowed', ldWindowed)
 
         xy = resample(data=windowed, numPts=10000)
-        xn = np.array([x[0] for x in xy])
-        yn = np.array([x[1] for x in xy])
+        xy = np.array([x for x in xy])
+        xn = xy[:,0]
+        yn = xy[:,1]
 
         offset = 1
         optimum = {"error":1e6}
         # Split the xy data
         for i in range(offset, len(xn) + 1 - offset):
             # Perform the linear fit for each subset of the xy data
-        	p1 = np.polyfit(xn[0:i+1], yn[0:i+1], 1, full=True)
-        	p2 = np.polyfit(xn[i:], yn[i:], 1, full=True)
+            p1 = np.polyfit(xn[0:i+1], yn[0:i+1], 1, full=True)
+            p2 = np.polyfit(xn[i:], yn[i:], 1, full=True)
 
-        	error = np.sum(p1[1]) + np.sum(p2[1])
+            error = np.sum(p1[1]) + np.sum(p2[1])
             # Store the best fit
-        	if error < optimum["error"]:
-        		optimum["error"] = error
-        		optimum["p1"] = p1
-        		optimum["p2"] = p2
+            if error < optimum["error"]:
+                optimum["error"] = error
+                optimum["p1"] = p1
+                optimum["p2"] = p2
 
         a, c = optimum["p1"][0]
         b, d = optimum["p2"][0]
@@ -657,8 +742,8 @@ for iii, r in enumerate(para[results_name]):
         if a == b:
             raise ValueError("xy_infl_pt: Optimal fit of two segments are parallel.")
         else:
-        	x0 = (d - c)/(a - b)
-        	y0 = a*(d - c)/(a - b) + c
+            x0 = (d - c)/(a - b)
+            y0 = a*(d - c)/(a - b) + c
 
         r[compute_value_name] = (x0, y0)
         testResults.append(r)
@@ -682,6 +767,9 @@ for iii, r in enumerate(para[results_name]):
 
         # Use subset of full traction-separation response
         windowed = [xi for xi in xy if xi[0] > windowMin and xi[0] < windowMax]
+        if len(windowed) == 0:
+            debug(f"windowMin {windowMin}, windowMax {windowMax}")
+            raise Exception("No points found in specified window")
 
         # Tolerance to zero
         if "zeroTol" not in r:
@@ -689,13 +777,18 @@ for iii, r in enumerate(para[results_name]):
 
         # Find pt where stress goes to target
         disp_crit = 0
+        closest_pt = None
         for pt in windowed:
             if abs(pt[1]) <= r["zeroTol"]:
                 disp_crit = pt[0]
                 break
+            elif closest_pt is None or abs(pt[1]) < abs(closest_pt[1]):
+                closest_pt = pt
 
         # Issue error if a value was not found
         if disp_crit == 0:
+            debug(f"Closest point to zero found at {closest_pt[0], closest_pt[1]}")
+            debug(f"zeroTol = {r['zeroTol']}")
             raise ValueError("disp_at_zero_y: Could not find a point where y data goes to zero")
 
         r[compute_value_name] = disp_crit
@@ -824,6 +917,7 @@ for iii, r in enumerate(para[results_name]):
         varName = historyOutputNameFromIdentifier(identifier=r[identifier_name], steps=steps)
 
         # Get the history data
+        identifier_list = r[identifier_name] if isinstance(r[identifier_name], list) else [r[identifier_name]]
         if evalStatement in r:
             xy = evaluate_statement(identifier_list=identifier_list, var_names=[varName],
                                     eval_statement=r[evalStatement])
@@ -835,12 +929,18 @@ for iii, r in enumerate(para[results_name]):
             else:
                 raise ValueError('Unexpected type received for identifier.')
             n = prefix + '_' + steps[0] + '_' + str(r[type_name])
-            xyDataObj = session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varName, steps=steps)
+            session.XYDataFromHistory(name=n, odb=odb, outputVariableName=varName, steps=steps)
             xy = session.xyDataObjects[n]
 
+        # Filter
+        if "filterCutOffFreq" in r[identifier_name]:
+            xy = butterworthFilter(xyData=session.xyDataObjects[n], cutoffFrequency=int(r[identifier_name]["filterCutOffFreq"]))
+            tmpName = xy.name
+            session.xyDataObjects.changeKey(tmpName, n+'_filt')
+            xy = session.xyDataObjects[n+'_filt']
 
         # Get the value calculated in the analysis (last frame must equal to 1, which is total step time)
-        r[compute_value_name] = xyDataObj[-1][1]
+        r[compute_value_name] = xy[-1][1]
 
         testResults.append(r)
 
@@ -916,13 +1016,39 @@ for iii, r in enumerate(para[results_name]):
     else:
         raise NotImplementedError("test_case result data not recognized: " + str(r))
 
+    # % error from computed value and reference value
+    if compute_value_name in r and reference_value_name in r:
+        if isinstance(r[compute_value_name], list):
+            pct_errs = list()
+            for (comp, ref) in zip(r[compute_value_name], r[reference_value_name]):
+                # Handle case when comp, ref are tuples (e.g. xy pairs)
+                if isinstance(comp, (tuple, list)):
+                    comp = comp[1]
+                    ref = ref[1]
+                if ref == 0:
+                    pct_errs.append(-1)
+                else:
+                    pct_errs.append(abs((comp - ref) / ref))
+            r[compute_value_pct_err_name] = pct_errs
+        else:
+            if r[reference_value_name] == 0:
+                r[compute_value_pct_err_name] = -1
+            else:
+                if isinstance(r[compute_value_name], (tuple, list)):
+                    comp = r[compute_value_name][1]
+                    ref = r[reference_value_name][1]
+                else:
+                    comp = r[compute_value_name]
+                    ref = r[reference_value_name]
+                r[compute_value_pct_err_name] = abs((comp - ref) / ref)
+
 # Save the odb
 if not readOnly:
     debug('Saving xy data')
     odb.save()
 
 # Write the results to a text file for assertions by test_runner
-fileName = os.path.join(os.getcwd(), jobName + '_results.py')
+fileName = os.path.join(outputDirectory, jobName + '_results.py')
 
 # Remove the old results file if it exists
 try:
