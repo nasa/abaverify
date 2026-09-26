@@ -609,6 +609,8 @@ class TestCase(unittest.TestCase):
 
                     # Loop through values if there are more than one
                     if hasattr(r['computedValue'], '__iter__'):
+                        self.assertEqual(len(r['computedValue']), len(r['referenceValue']),
+                                         "Computed and reference results must have the same length")
                         for i in range(0, len(r['computedValue'])):
                             computed_val = r['computedValue'][i]
                             reference_val = r['referenceValue'][i]
